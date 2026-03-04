@@ -20,26 +20,32 @@ const app = express();
 // CORS CONFIGURATION
 // =======================
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://idurar-erp.netlify.app"
+];
+
 const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://idurar-erp.netlify.app"
-  ],
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  origin: function (origin, callback) {
+
+    // allow requests with no origin (mobile apps / postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
   credentials: true
 };
 
 app.use(cors(corsOptions));
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin);
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  next();
-});
-
+// handle preflight requests
 app.options("*", cors(corsOptions));
 
 
@@ -59,6 +65,9 @@ app.use(express.urlencoded({
 }));
 
 app.use(compression());
+
+// optional uploads
+// app.use(fileUpload());
 
 
 // =======================
