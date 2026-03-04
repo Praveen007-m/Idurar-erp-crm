@@ -21,18 +21,18 @@ const app = express();
 // CORS CONFIGURATION
 // =======================
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://idurar-erp.netlify.app"
+];
+
 const corsOptions = {
   origin: function (origin, callback) {
 
-    // allow requests with no origin (mobile apps, curl etc.)
+    // allow requests without origin (like Postman / mobile apps)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = [
-      "http://localhost:3000",
-      "https://idurar-erp.netlify.app"
-    ];
-
-    // allow main domains
+    // allow listed origins
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -44,12 +44,16 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
+
   credentials: true,
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"]
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 };
 
+// apply cors
 app.use(cors(corsOptions));
+
+// handle preflight requests
 app.options("*", cors(corsOptions));
 
 
@@ -58,12 +62,19 @@ app.options("*", cors(corsOptions));
 // =======================
 
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.json({
+  limit: "50mb"
+}));
+
+app.use(express.urlencoded({
+  extended: true,
+  limit: "50mb"
+}));
 
 app.use(compression());
 
-// optional file uploads
+// optional uploads
 // app.use(fileUpload());
 
 
@@ -71,11 +82,19 @@ app.use(compression());
 // ROUTES
 // =======================
 
+// authentication
 app.use('/api', coreAuthRouter);
+
+// protected core APIs
 app.use('/api', adminAuth.isValidAuthToken, coreApiRouter);
+
+// ERP APIs
 app.use('/api', adminAuth.isValidAuthToken, erpApiRouter);
 
+// downloads
 app.use('/download', coreDownloadRouter);
+
+// public APIs
 app.use('/public', corePublicRouter);
 
 
