@@ -20,10 +20,17 @@ const app = express();
 
 app.use(
   cors({
-    origin: true,
-    credentials: true,
+    origin: [
+      "http://localhost:3000",
+      "https://idurar-erp.netlify.app"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
+
+app.options("*", cors());
 
 app.use(cookieParser());
 app.use(express.json());
