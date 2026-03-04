@@ -14,6 +14,11 @@ if (major < 20) {
 require('dotenv').config({ path: '.env' });
 require('dotenv').config({ path: '.env.local' });
 
+if (!process.env.DATABASE || typeof process.env.DATABASE !== 'string') {
+  console.error('Missing DATABASE in backend/.env (or backend/.env.local).');
+  process.exit(1);
+}
+
 mongoose.connect(process.env.DATABASE);
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;

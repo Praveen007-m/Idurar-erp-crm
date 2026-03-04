@@ -8,25 +8,39 @@ import { selectMoneyFormat } from '@/redux/settings/selectors';
 const useMoney = () => {
   const money_format_settings = useSelector(selectMoneyFormat);
 
-  const money_format_state = money_format_settings
+  let money_format_state = (money_format_settings
     ? money_format_settings
-    : storePersist.get('settings')?.money_format_settings;
+    : storePersist.get('settings')?.money_format_settings) || {};
+
+  // Force Indian Rupee defaults for this local implementation
+  if (money_format_state.currency_code !== 'INR' || money_format_state.currency_symbol !== '₹') {
+    money_format_state = {
+      ...money_format_state,
+      currency_symbol: '₹',
+      currency_code: 'INR',
+      currency_position: 'before',
+      decimal_sep: '.',
+      thousand_sep: ',',
+      cent_precision: 2,
+      zero_format: false,
+    };
+  }
 
   function currencyFormat({ amount, currency_code = money_format_state?.currency_code }) {
     return currency(amount).dollars() > 0 || !money_format_state?.zero_format
       ? currency(amount, {
-          separator: money_format_state?.thousand_sep,
-          decimal: money_format_state?.decimal_sep,
-          symbol: '',
-          precision: money_format_state?.cent_precision,
-        }).format()
+        separator: money_format_state?.thousand_sep,
+        decimal: money_format_state?.decimal_sep,
+        symbol: '',
+        precision: money_format_state?.cent_precision,
+      }).format()
       : 0 +
-          currency(amount, {
-            separator: money_format_state?.thousand_sep,
-            decimal: money_format_state?.decimal_sep,
-            symbol: '',
-            precision: money_format_state?.cent_precision,
-          }).format();
+      currency(amount, {
+        separator: money_format_state?.thousand_sep,
+        decimal: money_format_state?.decimal_sep,
+        symbol: '',
+        precision: money_format_state?.cent_precision,
+      }).format();
   }
 
   function moneyFormatter({ amount = 0, currency_code = money_format_state?.currency_code }) {

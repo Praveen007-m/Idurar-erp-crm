@@ -54,11 +54,6 @@ export default function DataTable({ config, extra = [] }) {
 
   const items = [
     {
-      label: translate('Show'),
-      key: 'read',
-      icon: <EyeOutlined />,
-    },
-    {
       label: translate('Edit'),
       key: 'edit',
       icon: <EditOutlined />,
@@ -187,9 +182,9 @@ export default function DataTable({ config, extra = [] }) {
             displayLabels={['name']}
             searchFields={'name'}
             onChange={filterTable}
-            // redirectLabel={'Add New Client'}
-            // withRedirect
-            // urlToRedirect={'/customer'}
+          // redirectLabel={'Add New Client'}
+          // withRedirect
+          // urlToRedirect={'/customer'}
           />,
           <Button onClick={handelDataTableLoad} key={`${uniqueId()}`} icon={<RedoOutlined />}>
             {translate('Refresh')}

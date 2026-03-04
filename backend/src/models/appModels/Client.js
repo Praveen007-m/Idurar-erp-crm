@@ -18,6 +18,32 @@ const schema = new mongoose.Schema({
   country: String,
   address: String,
   email: String,
+  loanAmount: {
+    type: Number,
+  },
+  interestRate: {
+    type: Number,
+  },
+  term: {
+    type: String,
+  },
+  startDate: {
+    type: Date,
+  },
+  repaymentType: {
+    type: String,
+    enum: ['Monthly EMI', 'Weekly', 'Daily'],
+  },
+  interestType: {
+    type: String,
+    enum: ['reducing', 'flat'],
+    default: 'reducing',
+  },
+  status: {
+    type: String,
+    enum: ['active', 'paid', 'defaulted'],
+    default: 'active',
+  },
   createdBy: { type: mongoose.Schema.ObjectId, ref: 'Admin' },
   assigned: { type: mongoose.Schema.ObjectId, ref: 'Admin' },
   created: {

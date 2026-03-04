@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Button, Drawer, Layout, Menu } from 'antd';
 
 import { useAppContext } from '@/context/appContext';
 
 import useLanguage from '@/locale/useLanguage';
 import logoIcon from '@/style/images/logo-icon.svg';
-import logoText from '@/style/images/logo-text.svg';
 
 import useResponsive from '@/hooks/useResponsive';
 
@@ -26,6 +26,7 @@ import {
   FilterOutlined,
   WalletOutlined,
   ReconciliationOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -45,10 +46,13 @@ function Sidebar({ collapsible, isMobile = false }) {
   const [showLogoApp, setLogoApp] = useState(isNavMenuClose);
   const [currentPath, setCurrentPath] = useState(location.pathname.slice(1));
 
+  const { current: currentAdmin } = useSelector((state) => state.auth);
+  const isAdmin = currentAdmin?.role !== 'staff';
+
   const translate = useLanguage();
   const navigate = useNavigate();
 
-  const items = [
+  let items = [
     {
       key: 'dashboard',
       icon: <DashboardOutlined />,
@@ -59,7 +63,6 @@ function Sidebar({ collapsible, isMobile = false }) {
       icon: <CustomerServiceOutlined />,
       label: <Link to={'/customer'}>{translate('customers')}</Link>,
     },
-
     {
       key: 'invoice',
       icon: <ContainerOutlined />,
@@ -74,6 +77,11 @@ function Sidebar({ collapsible, isMobile = false }) {
       key: 'payment',
       icon: <CreditCardOutlined />,
       label: <Link to={'/payment'}>{translate('payments')}</Link>,
+    },
+    {
+      key: 'repayment',
+      icon: <ReconciliationOutlined />,
+      label: <Link to={'/repayment'}>{translate('repayment')}</Link>,
     },
 
     {
@@ -97,6 +105,12 @@ function Sidebar({ collapsible, isMobile = false }) {
       icon: <ReconciliationOutlined />,
     },
   ];
+
+  if (!isAdmin) {
+    items = items.filter((item) =>
+      ['dashboard', 'customer', 'repayment', 'generalSettings'].includes(item.key)
+    );
+  }
 
   useEffect(() => {
     if (location)
@@ -149,20 +163,30 @@ function Sidebar({ collapsible, isMobile = false }) {
         onClick={() => navigate('/')}
         style={{
           cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        <img src={logoIcon} alt="Logo" style={{ marginLeft: '-5px', height: '40px' }} />
+        <img src={logoIcon} alt="Logo" style={{ marginLeft: '0px', height: '40px', width: '40px' }} />
 
         {!showLogoApp && (
-          <img
-            src={logoText}
-            alt="Logo"
+          <div
             style={{
-              marginTop: '3px',
-              marginLeft: '10px',
-              height: '38px',
+              marginTop: '0',
+              marginLeft: '8px',
+              fontSize: '13px',
+              fontWeight: 700,
+              lineHeight: 1.15,
+              color: '#0f2d52',
+              letterSpacing: '0.2px',
+              maxWidth: '180px',
+              whiteSpace: 'nowrap',
             }}
-          />
+          >
+            Webaac Solutions
+            <br />
+            Finance Management
+          </div>
         )}
       </div>
       <Menu

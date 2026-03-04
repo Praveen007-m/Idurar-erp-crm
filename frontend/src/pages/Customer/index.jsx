@@ -1,11 +1,14 @@
 import CrudModule from '@/modules/CrudModule/CrudModule';
-import DynamicForm from '@/forms/DynamicForm';
+import CustomerForm from '@/forms/CustomerForm';
 import { fields } from './config';
 
 import useLanguage from '@/locale/useLanguage';
+import { useNavigate } from 'react-router-dom';
+import { HistoryOutlined } from '@ant-design/icons';
 
 export default function Customer() {
   const translate = useLanguage();
+  const navigate = useNavigate();
   const entity = 'client';
   const searchConfig = {
     displayLabels: ['name'],
@@ -29,11 +32,21 @@ export default function Customer() {
     searchConfig,
     deleteModalLabels,
   };
+
+  const extra = [
+    {
+      label: translate('Repayments'),
+      key: 'repayments',
+      icon: <HistoryOutlined />,
+    },
+  ];
+
   return (
     <CrudModule
-      createForm={<DynamicForm fields={fields} />}
-      updateForm={<DynamicForm fields={fields} />}
+      createForm={<CustomerForm />}
+      updateForm={<CustomerForm isUpdateForm={true} />}
       config={config}
+      extra={extra}
     />
   );
 }
