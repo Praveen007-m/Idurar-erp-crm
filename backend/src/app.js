@@ -23,26 +23,27 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5173",
   "https://idurar-erp.netlify.app"
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
 
-    // allow requests without origin (Postman, mobile apps)
+    // allow requests with no origin (mobile apps, Postman)
     if (!origin) return callback(null, true);
 
-    // allow listed domains
+    // allow predefined domains
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // allow ALL Netlify preview / deploy URLs
-    if (origin && origin.endsWith(".netlify.app")) {
+    // allow ALL Netlify deploy previews
+    if (origin.endsWith(".netlify.app")) {
       return callback(null, true);
     }
 
-    return callback(new Error("Not allowed by CORS"));
+    return callback(new Error("CORS not allowed for this origin"));
   },
 
   credentials: true,
@@ -65,8 +66,8 @@ const corsOptions = {
 // apply cors middleware
 app.use(cors(corsOptions));
 
-// handle preflight requests
-app.options("*", cors(corsOptions));
+// allow preflight requests
+app.options('*', cors(corsOptions));
 
 
 // =======================
@@ -103,7 +104,7 @@ app.use('/api', adminAuth.isValidAuthToken, coreApiRouter);
 // ERP APIs
 app.use('/api', adminAuth.isValidAuthToken, erpApiRouter);
 
-// file downloads
+// downloads
 app.use('/download', coreDownloadRouter);
 
 // public routes
