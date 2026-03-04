@@ -13,7 +13,6 @@ const adminAuth = require('./controllers/coreControllers/adminAuth');
 const erpApiRouter = require('./routes/appRoutes/appApi');
 const errorHandlers = require('./handlers/errorHandlers');
 
-// create express app
 const app = express();
 
 
@@ -21,53 +20,21 @@ const app = express();
 // CORS CONFIGURATION
 // =======================
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "https://idurar-erp.netlify.app"
-];
-
 const corsOptions = {
-  origin: function (origin, callback) {
-
-    // allow requests with no origin (Postman, mobile apps)
-    if (!origin) return callback(null, true);
-
-    // allow predefined origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // allow Netlify deploy preview URLs
-    if (origin && origin.endsWith(".netlify.app")) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("CORS not allowed for this origin: " + origin));
-  },
-
-  credentials: true,
-
-  methods: [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS"
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://idurar-erp.netlify.app"
   ],
-
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization"
-  ]
+  credentials: true,
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"]
 };
 
-// apply CORS
 app.use(cors(corsOptions));
 
-// handle preflight requests
-app.options('*', cors(corsOptions));
+// allow preflight requests
+app.options("*", cors(corsOptions));
 
 
 // =======================
@@ -86,9 +53,6 @@ app.use(express.urlencoded({
 }));
 
 app.use(compression());
-
-// optional uploads
-// app.use(fileUpload());
 
 
 // =======================
