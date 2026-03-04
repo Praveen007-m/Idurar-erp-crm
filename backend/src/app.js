@@ -30,20 +30,20 @@ const allowedOrigins = [
 const corsOptions = {
   origin: function (origin, callback) {
 
-    // allow requests with no origin (mobile apps, Postman)
+    // allow requests with no origin (Postman, mobile apps)
     if (!origin) return callback(null, true);
 
-    // allow predefined domains
+    // allow predefined origins
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // allow ALL Netlify deploy previews
-    if (origin.endsWith(".netlify.app")) {
+    // allow Netlify deploy preview URLs
+    if (origin && origin.endsWith(".netlify.app")) {
       return callback(null, true);
     }
 
-    return callback(new Error("CORS not allowed for this origin"));
+    return callback(new Error("CORS not allowed for this origin: " + origin));
   },
 
   credentials: true,
@@ -63,10 +63,10 @@ const corsOptions = {
   ]
 };
 
-// apply cors middleware
+// apply CORS
 app.use(cors(corsOptions));
 
-// allow preflight requests
+// handle preflight requests
 app.options('*', cors(corsOptions));
 
 
