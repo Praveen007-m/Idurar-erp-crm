@@ -1,9 +1,8 @@
 const express = require('express');
-
 const cors = require('cors');
 const compression = require('compression');
-
 const cookieParser = require('cookie-parser');
+const fileUpload = require('express-fileupload');
 
 const coreAuthRouter = require('./routes/coreRoutes/coreAuth');
 const coreApiRouter = require('./routes/coreRoutes/coreApi');
@@ -11,26 +10,37 @@ const coreDownloadRouter = require('./routes/coreRoutes/coreDownloadRouter');
 const corePublicRouter = require('./routes/coreRoutes/corePublicRouter');
 const adminAuth = require('./controllers/coreControllers/adminAuth');
 
-const errorHandlers = require('./handlers/errorHandlers');
 const erpApiRouter = require('./routes/appRoutes/appApi');
+const errorHandlers = require('./handlers/errorHandlers');
 
-const fileUpload = require('express-fileupload');
-// create our Express app
+// create express app
 const app = express();
 
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "https://idurar-erp.netlify.app"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  })
-);
 
-app.options("*", cors());
+// =======================
+// CORS CONFIGURATION
+// =======================
+
+const corsOptions = {
+  origin: [
+    "http://localhost:3000",
+    "https://idurar-erp.netlify.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+};
+
+// enable cors
+app.use(cors(corsOptions));
+
+// handle preflight requests
+app.options("*", cors(corsOptions));
+
+
+// =======================
+// MIDDLEWARE
+// =======================
 
 app.use(cookieParser());
 app.use(express.json());
@@ -38,22 +48,29 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(compression());
 
-// // default options
+// optional file upload
 // app.use(fileUpload());
 
-// Here our API Routes
+
+// =======================
+// ROUTES
+// =======================
 
 app.use('/api', coreAuthRouter);
 app.use('/api', adminAuth.isValidAuthToken, coreApiRouter);
 app.use('/api', adminAuth.isValidAuthToken, erpApiRouter);
+
 app.use('/download', coreDownloadRouter);
 app.use('/public', corePublicRouter);
 
-// If that above routes didnt work, we 404 them and forward to error handler
-app.use(errorHandlers.notFound);
 
-// production error handler
+// =======================
+// ERROR HANDLERS
+// =======================
+
+app.use(errorHandlers.notFound);
 app.use(errorHandlers.productionErrors);
 
-// done! we export it so we can start the site in start.js
+
+// export app
 module.exports = app;
