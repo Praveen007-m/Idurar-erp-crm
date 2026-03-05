@@ -15,7 +15,6 @@ const errorHandlers = require('./handlers/errorHandlers');
 
 const app = express();
 
-
 // =====================================================
 // CORS CONFIGURATION
 // =====================================================
@@ -27,7 +26,7 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: (origin, callback) => {
+  origin: function(origin, callback) {
 
     if (!origin) return callback(null, true);
 
@@ -36,8 +35,7 @@ const corsOptions = {
     }
 
     console.log("Blocked by CORS:", origin);
-
-    return callback(null, true); // allow instead of throwing error
+    return callback(null, true);
   },
 
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
@@ -47,18 +45,13 @@ const corsOptions = {
     "Authorization"
   ],
 
-  credentials: true,
-  optionsSuccessStatus: 200
+  credentials: true
 };
 
 app.use(cors(corsOptions));
 
-app.options("*", (req, res) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.sendStatus(200);
-});
+// Let CORS middleware handle preflight
+app.options("*", cors(corsOptions));
 
 // =====================================================
 // MIDDLEWARE
