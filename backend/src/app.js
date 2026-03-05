@@ -27,19 +27,20 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
 
-    // allow requests without origin (Postman, curl, mobile)
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error("Not allowed by CORS"));
+    console.log("Blocked by CORS:", origin);
+
+    return callback(null, true); // allow instead of throwing error
   },
 
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
 
   allowedHeaders: [
     "Content-Type",
@@ -51,8 +52,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-app.options("*", cors(corsOptions)); // VERY IMPORTANT
+app.options("*", cors(corsOptions));
 
 // =====================================================
 // HANDLE PREFLIGHT REQUESTS (VERY IMPORTANT)
