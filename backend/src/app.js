@@ -28,23 +28,11 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // 1. Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) return callback(null, true);
-
-    // 2. Check if the origin exists in our allowed list
-    // Tip: .some() is safer if you want to use regex later
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    } else {
-      return callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // This reflects the request origin automatically (Only for debugging!)
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  // 3. Expand allowedHeaders to include 'Origin' and 'Accept'
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   credentials: true,
-  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200
 };
 
 // Use the middleware
