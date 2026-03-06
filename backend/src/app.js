@@ -16,20 +16,22 @@ const errorHandlers = require('./handlers/errorHandlers');
 const app = express();
 
 // =====================================================
-// CORS CONFIGURATION (ALLOW ALL)
+// CORS CONFIGURATION
 // =====================================================
 
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://idurar-erp.netlify.app"
+  ],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
+  credentials: true
+};
 
-// allow preflight
-app.options("*", cors());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // =====================================================
 // MIDDLEWARE
