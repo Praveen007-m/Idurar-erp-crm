@@ -14,23 +14,15 @@ function findKeyByPrefix(object, prefix) {
 }
 
 function includeToken() {
-  axios.defaults.baseURL = API_BASE_URL;function includeToken() {
   axios.defaults.baseURL = API_BASE_URL;
 
-  axios.defaults.withCredentials = false;
-
-  const auth = storePersist.get('auth');
-
-  if (auth) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${auth.current.token}`;
-  }
-}
-
   axios.defaults.withCredentials = true;
+
   const auth = storePersist.get('auth');
 
-  if (auth) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${auth.current.token}`;
+  if (auth && auth.current && auth.current.token) {
+    axios.defaults.headers.common['Authorization'] =
+      `Bearer ${auth.current.token}`;
   }
 }
 

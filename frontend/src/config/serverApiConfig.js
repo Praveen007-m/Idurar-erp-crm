@@ -1,26 +1,48 @@
+/**
+ * Backend URL
+ */
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_SERVER ||
+  "https://idurar-erp-crm-gyyk.onrender.com";
+
+/**
+ * API URL
+ */
 export const API_BASE_URL =
   import.meta.env.MODE === "production"
-    ? (import.meta.env.VITE_BACKEND_SERVER || "https://idurar-erp-crm-gyyk.onrender.com/") + "api/"
-    : "http://localhost:8888/api/";
+    ? `${BACKEND_URL}/api`
+    : "http://localhost:8888/api";
 
+/**
+ * Base URL
+ */
 export const BASE_URL =
   import.meta.env.MODE === "production"
-    ? (import.meta.env.VITE_BACKEND_SERVER || "https://idurar-erp-crm-gyyk.onrender.com/")
-    : "http://localhost:8888/";
+    ? BACKEND_URL
+    : "http://localhost:8888";
 
+/**
+ * Website URL
+ */
 export const WEBSITE_URL =
   import.meta.env.MODE === "production"
-    ? (import.meta.env.VITE_BACKEND_SERVER || "https://idurar-erp-crm-gyyk.onrender.com/")
-    : "http://localhost:3000/";
+    ? BACKEND_URL
+    : "http://localhost:3000";
 
+/**
+ * Download API
+ */
 export const DOWNLOAD_BASE_URL =
   import.meta.env.MODE === "production"
-    ? (import.meta.env.VITE_BACKEND_SERVER || "https://idurar-erp-crm-gyyk.onrender.com/") + "download/"
-    : "http://localhost:8888/download/";
+    ? `${BACKEND_URL}/download`
+    : "http://localhost:8888/download";
 
+/**
+ * File API
+ */
+export const FILE_BASE_URL = BASE_URL;
+
+/**
+ * Token name
+ */
 export const ACCESS_TOKEN_NAME = "x-auth-token";
-
-export const FILE_BASE_URL =
-  import.meta.env.MODE === "production"
-    ? (import.meta.env.VITE_BACKEND_SERVER || "https://idurar-erp-crm-gyyk.onrender.com/")
-    : "http://localhost:8888/";
