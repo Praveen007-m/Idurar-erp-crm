@@ -2,6 +2,11 @@ require('dotenv').config({ path: '.env' });
 require('dotenv').config({ path: '.env.local' });
 
 const mongoose = require('mongoose');
+if (!process.env.DATABASE || typeof process.env.DATABASE !== 'string') {
+  console.error('Missing DATABASE in backend/.env (or backend/.env.local).');
+  process.exit(1);
+}
+
 mongoose.connect(process.env.DATABASE);
 
 async function deleteData() {

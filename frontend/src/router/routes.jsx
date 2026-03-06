@@ -28,6 +28,8 @@ const Taxes = lazy(() => import('@/pages/Taxes'));
 const Profile = lazy(() => import('@/pages/Profile'));
 
 const About = lazy(() => import('@/pages/About'));
+const Repayment = lazy(() => import('@/pages/Repayment'));
+const ClientRepayment = lazy(() => import('@/pages/Repayment/ClientRepayment'));
 
 let routes = {
   expense: [],
@@ -122,6 +124,14 @@ let routes = {
     {
       path: '/profile',
       element: <Profile />,
+    },
+    {
+      path: '/repayment',
+      element: <Repayment />,
+    },
+    {
+      path: '/repayment/client/:id',
+      element: <ClientRepayment />,
     },
     {
       path: '*',

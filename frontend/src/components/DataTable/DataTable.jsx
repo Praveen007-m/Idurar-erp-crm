@@ -9,6 +9,7 @@ import {
   ArrowRightOutlined,
   ArrowLeftOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { Dropdown, Table, Button, Input } from 'antd';
 import { PageHeader } from '@ant-design/pro-layout';
 
@@ -46,13 +47,9 @@ export default function DataTable({ config, extra = [] }) {
   const translate = useLanguage();
   const { moneyFormatter } = useMoney();
   const { dateFormat } = useDate();
+  const navigate = useNavigate();
 
   const items = [
-    {
-      label: translate('Show'),
-      key: 'read',
-      icon: <EyeOutlined />,
-    },
     {
       label: translate('Edit'),
       key: 'edit',
@@ -124,6 +121,9 @@ export default function DataTable({ config, extra = [] }) {
 
                 case 'delete':
                   handleDelete(record);
+                  break;
+                case 'repayments':
+                  navigate(`/repayment/client/${record._id}`);
                   break;
                 case 'updatePassword':
                   handleUpdatePassword(record);

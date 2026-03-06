@@ -22,6 +22,8 @@ const colors = [
   { value: 'paid', label: 'paid', color: 'green', icon: '💳' },
   { value: 'partially', label: 'partially paid', color: 'purple', icon: '💰' },
   { value: 'overdue', label: 'overdue', color: 'red', icon: '💰' },
+  { value: 'not-paid', label: 'not-paid', color: 'red', icon: '❌' },
+  { value: 'late payment', label: 'late payment', color: 'gold', icon: '⏰' },
 
   { value: 'processing', label: 'processing', color: 'geekblue', icon: '⌛' },
   { value: 'packing', label: 'packing', color: 'orange', icon: '📦' },

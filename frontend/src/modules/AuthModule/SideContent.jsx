@@ -1,5 +1,5 @@
 import { Space, Layout, Divider, Typography } from 'antd';
-import logo from '@/style/images/idurar-crm-erp.svg';
+import logo from '@/style/images/logo-icon.svg';
 import useLanguage from '@/locale/useLanguage';
 import { useSelector } from 'react-redux';
 
@@ -22,17 +22,20 @@ export default function SideContent() {
       <div style={{ width: '100%' }}>
         <img
           src={logo}
-          alt="IDURAR ERP CRM"
-          style={{ margin: '0 0 40px', display: 'block' }}
-          height={63}
-          width={220}
+          alt="Webaac Solutions Finance Management"
+          style={{ margin: '0 0 18px', display: 'block' }}
+          height={52}
+          width={52}
         />
+        <Title level={3} style={{ marginTop: 0, marginBottom: 20 }}>
+          Webaac Solutions Finance Management
+        </Title>
 
         <Title level={1} style={{ fontSize: 28 }}>
-          Free Open Source ERP / CRM
+          Finance Management Platform
         </Title>
         <Text>
-          Accounting / Invoicing / Quote App <b /> based on Node.js React.js Ant Design
+          Accounting / Invoicing / Repayment App built with Node.js, React.js and Ant Design
         </Text>
 
         <div className="space20"></div>

@@ -16,11 +16,6 @@ export default function RecentTable({ ...props }) {
 
   const items = [
     {
-      label: translate('Show'),
-      key: 'read',
-      icon: <EyeOutlined />,
-    },
-    {
       label: translate('Edit'),
       key: 'edit',
       icon: <EditOutlined />,
