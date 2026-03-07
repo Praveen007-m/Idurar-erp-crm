@@ -1,0 +1,7 @@
+{
+  "user": "praveen@idurar.com",
+  "passwordDoc": {
+    "salt": "$2a$10$VZTuXKBi57U3RoecspBTku",
+    "hash": "$2a$10$W5nsZtjHiPWPCKa.WEp.tup8auA9FKDU7gPkAlnb2ToVdCFsJJHRK"
+  }
+}

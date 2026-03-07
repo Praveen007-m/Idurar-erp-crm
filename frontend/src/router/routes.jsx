@@ -1,6 +1,7 @@
 import { lazy } from 'react';
-
+import Staff from "@/pages/Staff";
 import { Navigate } from 'react-router-dom';
+import ProtectedRoute from './ProtectedRoute';
 
 const Logout = lazy(() => import('@/pages/Logout.jsx'));
 const NotFound = lazy(() => import('@/pages/NotFound.jsx'));
@@ -46,13 +47,27 @@ let routes = {
       path: '/about',
       element: <About />,
     },
+    // Dashboard - Admin only (owner, admin)
     {
       path: '/',
-      element: <Dashboard />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Dashboard />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/customer',
       element: <Customer />,
+    },
+    // Staff Management - Admin only (owner, admin)
+    {
+      path: "/staff",
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Staff />
+        </ProtectedRoute>
+      ),
     },
 
     {

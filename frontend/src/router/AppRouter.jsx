@@ -3,6 +3,8 @@ import { lazy, useEffect } from 'react';
 import {} from 'react-router-dom';
 import {} from 'react-router-dom';
 import { Navigate, useLocation, useRoutes } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { selectCurrentAdmin } from '@/redux/auth/selectors';
 import { useAppContext } from '@/context/appContext';
 
 import routes from './routes';
@@ -11,6 +13,8 @@ export default function AppRouter() {
   let location = useLocation();
   const { state: stateApp, appContextAction } = useAppContext();
   const { app } = appContextAction;
+  
+  const currentAdmin = useSelector(selectCurrentAdmin);
 
   const routesList = [];
 
@@ -29,6 +33,16 @@ export default function AppRouter() {
     // Return 'default' app  if the path is not found
     return 'default';
   }
+  
+  // Handle staff redirect on initial load
+  // When staff tries to access root '/', redirect to /customer
+  useEffect(() => {
+    if (currentAdmin && currentAdmin.role === 'staff' && location.pathname === '/') {
+      // Staff will be handled by ProtectedRoute in routes
+      // This is just to ensure smooth transition
+    }
+  }, [location, currentAdmin]);
+  
   useEffect(() => {
     if (location.pathname === '/') {
       app.default();

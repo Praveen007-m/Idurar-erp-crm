@@ -57,7 +57,8 @@ export default function Repayment() {
   const dispatch = useDispatch();
 
   const { result: listResult, isLoading } = useSelector(selectListItems);
-  const clients = listResult?.items || [];
+  // Ensure clients is always an array to prevent "clients.filter is not a function" error
+  const clients = Array.isArray(listResult?.items) ? listResult.items : [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(dayjs());
@@ -210,7 +211,8 @@ export default function Repayment() {
   };
 
   const paidAmount = useMemo(() => {
-    return clientRepayments
+    const repaymentsArray = Array.isArray(clientRepayments) ? clientRepayments : [];
+    return repaymentsArray
       .filter((item) => item?.status === 'paid')
       .reduce((sum, item) => sum + Number(item?.amount || 0), 0);
   }, [clientRepayments]);

@@ -1,37 +1,63 @@
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+const mongoose = require("mongoose");
 
-const adminSchema = new Schema({
-  removed: {
-    type: Boolean,
-    default: false,
-  },
-  enabled: {
-    type: Boolean,
-    default: false,
-  },
+const adminSchema = new mongoose.Schema(
+  {
+    removed: {
+      type: Boolean,
+      default: false,
+    },
 
-  email: {
-    type: String,
-    lowercase: true,
-    trim: true,
-    required: true,
-  },
-  name: { type: String, required: true },
-  surname: { type: String },
-  photo: {
-    type: String,
-    trim: true,
-  },
-  created: {
-    type: Date,
-    default: Date.now,
-  },
-  role: {
-    type: String,
-    default: 'owner',
-    enum: ['owner', 'admin', 'staff'],
-  },
-});
+    enabled: {
+      type: Boolean,
+      default: true,
+    },
 
-module.exports = mongoose.model('Admin', adminSchema);
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    surname: {
+      type: String,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      match: [/^[6-9]\d{9}$/, "Please enter a valid mobile number"],
+    },
+
+    password: {
+      type: String,
+      required: true,
+      select: false, // do not return password in queries
+    },
+
+    photo: {
+      type: String,
+      trim: true,
+    },
+
+    role: {
+      type: String,
+      enum: ["owner", "admin", "staff"],
+      default: "staff",
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model("Admin", adminSchema);

@@ -1,10 +1,11 @@
 /**
- * Simple Test Script
+ * Bcrypt Test
  */
 require('dotenv').config({ path: '.env' });
 require('dotenv').config({ path: '.env.local' });
 
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
 require('./src/models/coreModels/Admin');
@@ -18,13 +19,25 @@ async function test() {
   const user = await Admin.findOne({ email: 'praveen@idurar.com' });
   const pw = await AdminPassword.findOne({ user: user._id });
   
-  const result = {
-    user: user ? user.email : 'not found',
-    passwordDoc: pw ? { salt: pw.salt, hash: pw.password } : 'not found'
-  };
+  const password = 'staff123';
+  const salt = pw.salt;
+  const storedHash = pw.password;
   
-  fs.writeFileSync('test_result.json', JSON.stringify(result, null, 2));
-  console.log('Done');
+  // Test bcrypt compare the same way authUser.js does
+  const isMatch = await bcrypt.compare(salt + password, storedHash);
+  
+  console.log('Password:', password);
+  console.log('Salt:', salt);
+  console.log('Stored Hash:', storedHash);
+  console.log('Test Hash (salt+password):', bcrypt.hashSync(salt + password, 10));
+  console.log('Is Match:', isMatch);
+  
+  if (isMatch) {
+    console.log('\n✅ LOGIN WILL WORK!');
+  } else {
+    console.log('\n❌ LOGIN WILL FAIL!');
+  }
+  
   process.exit(0);
 }
 

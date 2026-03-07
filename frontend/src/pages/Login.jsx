@@ -8,7 +8,7 @@ import useLanguage from '@/locale/useLanguage';
 import { Form, Button } from 'antd';
 
 import { login } from '@/redux/auth/actions';
-import { selectAuth } from '@/redux/auth/selectors';
+import { selectAuth, selectCurrentAdmin } from '@/redux/auth/selectors';
 import LoginForm from '@/forms/LoginForm';
 import Loading from '@/components/Loading';
 import AuthModule from '@/modules/AuthModule';
@@ -16,17 +16,25 @@ import AuthModule from '@/modules/AuthModule';
 const LoginPage = () => {
   const translate = useLanguage();
   const { isLoading, isSuccess } = useSelector(selectAuth);
+  const currentAdmin = useSelector(selectCurrentAdmin);
   const navigate = useNavigate();
-  // const size = useSize();
 
   const dispatch = useDispatch();
+
   const onFinish = (values) => {
     dispatch(login({ loginData: values }));
   };
 
   useEffect(() => {
-    if (isSuccess) navigate('/');
-  }, [isSuccess]);
+    if (isSuccess && currentAdmin) {
+      // Redirect based on role: staff goes to /customer, others go to /
+      if (currentAdmin.role === 'staff') {
+        navigate('/customer');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [isSuccess, currentAdmin, navigate]);
 
   const FormContainer = () => {
     return (
@@ -36,13 +44,12 @@ const LoginPage = () => {
           name="normal_login"
           className="login-form"
           initialValues={{
-            remember: true,
-            email:'admin@admin.com',
-            password:'admin123',
+            remember: true
           }}
           onFinish={onFinish}
         >
           <LoginForm />
+
           <Form.Item>
             <Button
               type="primary"
@@ -54,6 +61,7 @@ const LoginPage = () => {
               {translate('Log in')}
             </Button>
           </Form.Item>
+
         </Form>
       </Loading>
     );
