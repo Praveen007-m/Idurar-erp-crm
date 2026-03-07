@@ -47,12 +47,19 @@ export const crud = {
       let data = await request.list({ entity, options });
 
       if (data.success === true) {
+        // Handle both response formats:
+        // - result: [...] (array directly)
+        // - result: { items: [...] } (nested)
+        const items = Array.isArray(data.result) 
+          ? data.result 
+          : (data.result?.items || []);
+        
         const result = {
-          items: data.result,
+          items: items,
           pagination: {
-            current: parseInt(data.pagination.page, 10),
-            pageSize: options?.items,
-            total: parseInt(data.pagination.count, 10),
+            current: parseInt(data.pagination?.page, 10) || 1,
+            pageSize: options?.items || 10,
+            total: parseInt(data.pagination?.count, 10) || 0,
           },
         };
         dispatch({

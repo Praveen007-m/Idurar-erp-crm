@@ -62,7 +62,7 @@ function modelController() {
 
       return res.status(200).json({
         success: true,
-        result: { items: result },
+        result: result,
         pagination: {
           page,
           pages: Math.ceil(count / limit),
