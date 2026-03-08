@@ -2,15 +2,9 @@ const mongoose = require('mongoose');
 const createCRUDController = require('@/controllers/middlewaresControllers/createCRUDController');
 const { buildStaffFilter } = require('@/helpers/staffFilter');
 
-const create = require('./create');
-const summary = require('./summary');
-const update = require('./update');
-const remove = require('./remove');
-const sendMail = require('./sendMail');
-
 function modelController() {
-  const Model = mongoose.model('Payment');
-  const methods = createCRUDController('Payment');
+  const Model = mongoose.model('Repayment');
+  const methods = createCRUDController('Repayment');
 
   // Override list method with staff filtering
   methods.list = async (req, res) => {
@@ -19,9 +13,9 @@ function modelController() {
       const limit = parseInt(req.query.items) || 10;
       const skip = page * limit - limit;
 
-      const { sortBy = 'created', sortValue = -1, filter, equal } = req.query;
+      const { sortBy = 'date', sortValue = -1, filter, equal } = req.query;
 
-      // Build staff filter - payments are linked to clients through invoice
+      // Build staff filter
       const staffFilter = await buildStaffFilter(req.admin, 'client');
 
       const fieldsArray = req.query.fields ? req.query.fields.split(',') : [];
@@ -87,11 +81,121 @@ function modelController() {
     }
   };
 
+  // Override create method to ensure staff can only create repayments for their clients
+  methods.create = async (req, res) => {
+    try {
+      // Build staff filter to validate client access
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
+      
+      // If staff, verify the client is assigned to them
+      if (req.admin.role === 'staff' && req.body.client) {
+        const clientIds = await mongoose.model('Client').find({
+          assigned: req.admin._id,
+          removed: false
+        }).select('_id');
+        
+        const clientIdStrings = clientIds.map(id => id.toString());
+        if (!clientIdStrings.includes(req.body.client.toString())) {
+          return res.status(403).json({
+            success: false,
+            result: null,
+            message: 'You can only create repayments for your assigned clients',
+          });
+        }
+      }
+
+      // Check for duplicate repayment - prevent creating multiple repayments for same client and date
+      if (req.body.client && req.body.date) {
+        const repaymentDate = new Date(req.body.date);
+        // Normalize to start of day for comparison
+        repaymentDate.setHours(0, 0, 0, 0);
+        
+        const nextDay = new Date(repaymentDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        const existingRepayment = await Model.findOne({
+          client: req.body.client,
+          date: {
+            $gte: repaymentDate,
+            $lt: nextDay
+          },
+          removed: false
+        });
+        
+        if (existingRepayment) {
+          return res.status(400).json({
+            success: false,
+            result: null,
+            message: 'A repayment already exists for this client on this date',
+          });
+        }
+      }
+
+      const result = await Model.create(req.body);
+      return res.status(200).json({
+        success: true,
+        result,
+        message: 'Successfully created Repayment',
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        result: null,
+        message: error.message,
+        error: error,
+      });
+    }
+  };
+
   // Override update method with staff filtering
   methods.update = async (req, res) => {
     try {
       // Build staff filter
       const staffFilter = await buildStaffFilter(req.admin, 'client');
+
+      // Find the existing repayment first
+      const existingRepayment = await Model.findOne({
+        _id: req.params.id,
+        removed: false,
+        ...staffFilter,
+      }).populate('client').exec();
+
+      if (!existingRepayment) {
+        return res.status(404).json({
+          success: false,
+          result: null,
+          message: 'No document found',
+        });
+      }
+
+      // If updating date or client, find and update all duplicates
+      const { date, client } = req.body;
+      
+      if (date || client) {
+        const newDate = date ? new Date(date) : existingRepayment.date;
+        const newClient = client || existingRepayment.client._id;
+
+        // Find all repayments with the same date and client
+        const duplicates = await Model.find({
+          _id: { $ne: req.params.id },
+          client: newClient,
+          date: {
+            $gte: new Date(newDate.setHours(0, 0, 0, 0)),
+            $lt: new Date(new Date(newDate).setHours(23, 59, 59, 999))
+          },
+          removed: false,
+        });
+
+        // Update all duplicates with the new values
+        const updateData = { ...req.body, updated: new Date() };
+        if (duplicates.length > 0) {
+          const duplicateIds = duplicates.map(d => d._id);
+          await Model.updateMany(
+            { _id: { $in: duplicateIds } },
+            updateData
+          );
+        }
+      }
 
       const result = await Model.findOneAndUpdate(
         {
@@ -99,12 +203,15 @@ function modelController() {
           removed: false,
           ...staffFilter,
         },
-        req.body,
+        { 
+          ...req.body,
+          updated: new Date() 
+        },
         {
           new: true,
           runValidators: true,
         }
-      ).exec();
+      ).populate().exec();
 
       if (!result) {
         return res.status(404).json({
@@ -117,7 +224,7 @@ function modelController() {
       return res.status(200).json({
         success: true,
         result,
-        message: 'Successfully updated Payment',
+        message: 'Successfully updated Repayment',
       });
     } catch (error) {
       return res.status(500).json({
@@ -156,7 +263,7 @@ function modelController() {
       return res.status(200).json({
         success: true,
         result,
-        message: 'Successfully deleted Payment',
+        message: 'Successfully deleted Repayment',
       });
     } catch (error) {
       return res.status(500).json({
@@ -202,12 +309,6 @@ function modelController() {
       });
     }
   };
-
-  methods.mail = sendMail;
-  methods.create = create;
-  methods.update = update;
-  methods.delete = remove;
-  methods.summary = summary;
 
   return methods;
 }

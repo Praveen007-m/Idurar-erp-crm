@@ -3,12 +3,11 @@ import CustomerForm from '@/forms/CustomerForm';
 import { fields } from './config';
 
 import useLanguage from '@/locale/useLanguage';
-import { useNavigate } from 'react-router-dom';
 import { HistoryOutlined } from '@ant-design/icons';
 
 export default function Customer() {
   const translate = useLanguage();
-  const navigate = useNavigate();
+
   const entity = 'client';
   const searchConfig = {
     displayLabels: ['name'],
@@ -43,8 +42,8 @@ export default function Customer() {
 
   return (
     <CrudModule
-      createForm={<CustomerForm />}
-      updateForm={<CustomerForm isUpdateForm={true} />}
+      createForm={() => <CustomerForm />}
+      updateForm={() => <CustomerForm isUpdateForm={true} />}
       config={config}
       extra={extra}
     />

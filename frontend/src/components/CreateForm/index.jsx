@@ -10,7 +10,7 @@ import useLanguage from '@/locale/useLanguage';
 import { Button, Form } from 'antd';
 import Loading from '@/components/Loading';
 
-export default function CreateForm({ config, formElements, withUpload = false }) {
+export default function CreateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
   const dispatch = useDispatch();
   const { isLoading, isSuccess } = useSelector(selectCreatedItem);
@@ -47,12 +47,7 @@ export default function CreateForm({ config, formElements, withUpload = false })
   return (
     <Loading isLoading={isLoading}>
       <Form form={form} layout="vertical" onFinish={onSubmit}>
-        {formElements}
-        <Form.Item>
-          <Button type="primary" htmlType="submit">
-            {translate('Submit')}
-          </Button>
-        </Form.Item>
+        {typeof formElements === 'function' ? formElements({ onCancel }) : formElements}
       </Form>
     </Loading>
   );

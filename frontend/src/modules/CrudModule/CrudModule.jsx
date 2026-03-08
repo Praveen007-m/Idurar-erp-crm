@@ -18,7 +18,7 @@ import { useCrudContext } from '@/context/crud';
 
 import { CrudLayout } from '@/layout';
 
-function SidePanelTopContent({ config, formElements, withUpload }) {
+function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
   const translate = useLanguage();
   const { crudContextAction, state } = useCrudContext();
   const { deleteModalLabels } = config;
@@ -80,7 +80,7 @@ function SidePanelTopContent({ config, formElements, withUpload }) {
         <div className="space10"></div>
       </Row>
       <ReadItem config={config} />
-      <UpdateForm config={config} formElements={formElements} withUpload={withUpload} />
+      <UpdateForm config={config} formElements={formElements} withUpload={withUpload} onCancel={onCancel} />
     </>
   );
 }

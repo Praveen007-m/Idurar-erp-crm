@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Invoice');
 
@@ -20,9 +21,13 @@ const update = async (req, res) => {
     });
   }
 
+  // Build staff filter
+  const staffFilter = await buildStaffFilter(req.admin, 'client');
+
   const previousInvoice = await Model.findOne({
     _id: req.params.id,
     removed: false,
+    ...staffFilter,
   });
 
   const { credit } = previousInvoice;
@@ -67,9 +72,13 @@ const update = async (req, res) => {
     calculate.sub(total, discount) === credit ? 'paid' : credit > 0 ? 'partially' : 'unpaid';
   body['paymentStatus'] = paymentStatus;
 
-  const result = await Model.findOneAndUpdate({ _id: req.params.id, removed: false }, body, {
-    new: true, // return the new result instead of the old one
-  }).exec();
+  const result = await Model.findOneAndUpdate(
+    { _id: req.params.id, removed: false, ...staffFilter },
+    body,
+    {
+      new: true, // return the new result instead of the old one
+    }
+  ).exec();
 
   // Returning successfull response
 

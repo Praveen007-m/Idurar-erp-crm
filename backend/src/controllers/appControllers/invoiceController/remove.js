@@ -1,13 +1,18 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Invoice');
 const ModelPayment = mongoose.model('Payment');
 
 const remove = async (req, res) => {
+  // Build staff filter
+  const staffFilter = await buildStaffFilter(req.admin, 'client');
+
   const deletedInvoice = await Model.findOneAndUpdate(
     {
       _id: req.params.id,
       removed: false,
+      ...staffFilter,
     },
     {
       $set: {

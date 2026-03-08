@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
+const { getStaffClientIds } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Payment');
+const Invoice = mongoose.model('Invoice');
 const { loadSettings } = require('@/middlewares/settings');
 
 const summary = async (req, res) => {
@@ -27,16 +29,33 @@ const summary = async (req, res) => {
   let startDate = currentDate.clone().startOf(defaultType);
   let endDate = currentDate.clone().endOf(defaultType);
 
+  // Build staff filter - get client IDs assigned to staff
+  let clientFilter = {};
+  if (req.admin && req.admin.role === 'staff') {
+    const clientIds = await getStaffClientIds(req.admin);
+    if (!clientIds || clientIds.length === 0) {
+      // Staff has no assigned clients - return empty result
+      return res.status(200).json({
+        success: true,
+        result: { count: 0, total: 0 },
+        message: `Successfully fetched the summary of payment invoices for the last ${defaultType}`,
+      });
+    }
+    // Get invoices belonging to these clients
+    const invoices = await Invoice.find({
+      client: { $in: clientIds },
+      removed: false,
+    }).select('_id');
+    const invoiceIds = invoices.map((inv) => inv._id);
+    clientFilter = { invoice: { $in: invoiceIds } };
+  }
+
   // get total amount of invoices
   const result = await Model.aggregate([
     {
       $match: {
         removed: false,
-
-        // date: {
-        //   $gte: startDate.toDate(),
-        //   $lte: endDate.toDate(),
-        // },
+        ...clientFilter,
       },
     },
     {

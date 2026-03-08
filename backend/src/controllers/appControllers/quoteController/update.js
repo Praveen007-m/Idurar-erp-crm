@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Quote');
 
@@ -7,6 +8,9 @@ const custom = require('@/controllers/pdfController');
 const { calculate } = require('@/helpers');
 
 const update = async (req, res) => {
+  // Build staff filter
+  const staffFilter = await buildStaffFilter(req.admin, 'client');
+
   const { items = [], taxRate = 0, discount = 0 } = req.body;
 
   if (items.length === 0) {
@@ -46,9 +50,21 @@ const update = async (req, res) => {
   }
   // Find document by id and updates with the required fields
 
-  const result = await Model.findOneAndUpdate({ _id: req.params.id, removed: false }, body, {
-    new: true, // return the new result instead of the old one
-  }).exec();
+  const result = await Model.findOneAndUpdate(
+    { _id: req.params.id, removed: false, ...staffFilter },
+    body,
+    {
+      new: true, // return the new result instead of the old one
+    }
+  ).exec();
+
+  if (!result) {
+    return res.status(404).json({
+      success: false,
+      result: null,
+      message: 'No document found',
+    });
+  }
 
   // Returning successfull response
 

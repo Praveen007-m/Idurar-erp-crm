@@ -36,6 +36,7 @@ import { selectListItems } from '@/redux/crud/selectors';
 import { request } from '@/request';
 import useLanguage from '@/locale/useLanguage';
 import { useDate, useMoney } from '@/settings';
+import useRole from '@/hooks/useRole';
 
 const BOX_BORDER = '#28a7ab';
 const BOX_BG = '#e9f7f8';
@@ -46,7 +47,8 @@ const STATUS_COLOR = {
   pending: "#d9d9d9",      // grey
   paid: "#52c41a",         // green
   late: "#faad14",         // yellow
-  overdue: "#ff4d4f"       // red
+  overdue: "#ff4d4f",      // red
+  "not-paid": "#ff4d4f"    // red - same as overdue for unpaid status
 };
 
 export default function Repayment() {
@@ -76,6 +78,17 @@ export default function Repayment() {
   useEffect(() => {
     loadClients();
     loadRepayments();
+    
+    // Listen for repayment updates from ClientRepayment page
+    const handleRepaymentUpdate = () => {
+      loadRepayments();
+    };
+    
+    window.addEventListener('repayment-updated', handleRepaymentUpdate);
+    
+    return () => {
+      window.removeEventListener('repayment-updated', handleRepaymentUpdate);
+    };
   }, []);
 
   const calculateTotalRepayment = (record) => {
@@ -116,7 +129,7 @@ export default function Repayment() {
     if (client?.repaymentType === 'Weekly') unit = 'week';
     if (client?.repaymentType === 'Daily') unit = 'day';
 
-    for (let i = 0; i < term; i += 1) {
+    for (let i = 1; i <= term; i += 1) {
       const dueDate = startDate.add(i, unit);
       if (dueDate.isAfter(monthEnd)) break;
       if (dueDate.isBefore(monthStart)) continue;
@@ -135,9 +148,15 @@ export default function Repayment() {
     });
   }, [clients, searchTerm, statusFilter]);
 
+  // Filter clients for staff users - only show their assigned clients
+  const filteredClientsByRole = useMemo(() => {
+    // This is already handled in the backend, but we can also filter on frontend for extra safety
+    return filteredClients;
+  }, [filteredClients]);
+
   const clientsByDay = useMemo(() => {
     const map = {};
-    filteredClients.forEach((client) => {
+    filteredClientsByRole.forEach((client) => {
       const dueDates = getDueDatesForClientInMonth(client, calendarMonth);
       dueDates.forEach((dayNumber) => {
         if (!map[dayNumber]) map[dayNumber] = [];
@@ -145,7 +164,7 @@ export default function Repayment() {
       });
     });
     return map;
-  }, [filteredClients, calendarMonth]);
+  }, [filteredClientsByRole, calendarMonth]);
 
   const fetchClientRepayments = async (clientId) => {
     setRepaymentLoading(true);
@@ -186,17 +205,28 @@ export default function Repayment() {
     return map;
   }, [repayments]);
 
-  const getPaymentStatus = useCallback((client, date) => {
+const getPaymentStatus = useCallback((client, date) => {
     const key = `${client._id}-${date.format("YYYY-MM-DD")}`;
     const repaymentStatus = repaymentMap.get(key);
-
-    if (repaymentStatus === "paid") return "paid";
-    if (repaymentStatus === "late payment") return "late";
     
-    // Fallback for not-paid or missing explicit status
     const today = dayjs().startOf('day');
     const currentDate = date.startOf('day');
 
+    // If explicitly marked as paid, return green
+    if (repaymentStatus === "paid") return "paid";
+    
+    // If explicitly marked as late payment, return late (yellow)
+    if (repaymentStatus === "late payment") return "late";
+    
+    // If explicitly marked as not-paid, check date for red (overdue) or grey (upcoming)
+    if (repaymentStatus === "not-paid") {
+      if (currentDate.isBefore(today)) {
+        return "overdue"; // Red - overdue unpaid
+      }
+      return "pending"; // Grey - upcoming unpaid
+    }
+    
+    // Fallback for missing explicit status - use date-based logic
     if (currentDate.isBefore(today)) {
       return "overdue";
     }

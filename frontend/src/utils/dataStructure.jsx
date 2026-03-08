@@ -191,6 +191,7 @@ export function dataForTable({ fields, translate, moneyFormatter, dateFormat }) 
     const defaultComponent = {
       title: field.label ? translate(field.label) : translate(key),
       dataIndex: keyIndex,
+      render: field.render ? field.render : undefined,
     };
 
     const type = field.type;

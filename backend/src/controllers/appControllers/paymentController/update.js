@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getStaffClientIds } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Payment');
 const Invoice = mongoose.model('Invoice');
@@ -14,11 +15,41 @@ const update = async (req, res) => {
       message: `The Minimum Amount couldn't be 0`,
     });
   }
+
+  // Build staff filter for payment lookup
+  let staffFilter = {};
+  if (req.admin && req.admin.role === 'staff') {
+    const clientIds = await getStaffClientIds(req.admin);
+    if (!clientIds || clientIds.length === 0) {
+      return res.status(403).json({
+        success: false,
+        result: null,
+        message: 'You do not have permission to update payments',
+      });
+    }
+    // Get invoices belonging to these clients
+    const invoices = await Invoice.find({
+      client: { $in: clientIds },
+      removed: false,
+    }).select('_id');
+    const invoiceIds = invoices.map((inv) => inv._id);
+    staffFilter = { invoice: { $in: invoiceIds } };
+  }
+
   // Find document by id and updates with the required fields
   const previousPayment = await Model.findOne({
     _id: req.params.id,
     removed: false,
+    ...staffFilter,
   });
+
+  if (!previousPayment) {
+    return res.status(404).json({
+      success: false,
+      result: null,
+      message: 'No document found',
+    });
+  }
 
   const { amount: previousAmount } = previousPayment;
   const { id: invoiceId, total, discount, credit: previousCredit } = previousPayment.invoice;
@@ -56,7 +87,7 @@ const update = async (req, res) => {
   };
 
   const result = await Model.findOneAndUpdate(
-    { _id: req.params.id, removed: false },
+    { _id: req.params.id, removed: false, ...staffFilter },
     { $set: updates },
     {
       new: true, // return the new result instead of the old one

@@ -1,12 +1,17 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Invoice');
 
 const read = async (req, res) => {
+  // Build staff filter
+  const staffFilter = await buildStaffFilter(req.admin, 'client');
+
   // Find document by id
   const result = await Model.findOne({
     _id: req.params.id,
     removed: false,
+    ...staffFilter,
   })
     .populate('createdBy', 'name')
     .exec();

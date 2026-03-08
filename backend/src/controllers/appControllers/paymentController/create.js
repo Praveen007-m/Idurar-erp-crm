@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Payment');
 const Invoice = mongoose.model('Invoice');
+const Client = mongoose.model('Client');
 const custom = require('@/controllers/pdfController');
 
 const { calculate } = require('@/helpers');
@@ -14,6 +16,37 @@ const create = async (req, res) => {
       result: null,
       message: `The Minimum Amount couldn't be 0`,
     });
+  }
+
+  // Staff can only create payments for invoices belonging to their assigned clients
+  if (req.admin && req.admin.role === 'staff') {
+    const invoice = await Invoice.findOne({
+      _id: req.body.invoice,
+      removed: false,
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        result: null,
+        message: 'Invoice not found',
+      });
+    }
+
+    // Check if the client is assigned to this staff
+    const client = await Client.findOne({
+      _id: invoice.client,
+      assigned: req.admin._id,
+      removed: false,
+    });
+
+    if (!client) {
+      return res.status(403).json({
+        success: false,
+        result: null,
+        message: 'You can only create payments for your assigned clients',
+      });
+    }
   }
 
   const currentInvoice = await Invoice.findOne({

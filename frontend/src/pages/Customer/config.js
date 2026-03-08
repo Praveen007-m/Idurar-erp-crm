@@ -39,4 +39,17 @@ export const fields = {
       { value: 'defaulted', label: 'Defaulted', color: 'red' },
     ],
   },
+  assigned: {
+    type: 'related',
+    relation: 'Admin',
+    label: 'Assigned Staff',
+    render: (text, record) => {
+      // Handle populated assigned staff object
+      if (record.assigned && typeof record.assigned === 'object') {
+        return record.assigned.name || record.assigned.email || '-';
+      }
+      // Handle null or undefined
+      return '-';
+    },
+  },
 };

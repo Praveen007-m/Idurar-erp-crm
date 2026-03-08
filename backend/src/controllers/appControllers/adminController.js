@@ -150,6 +150,38 @@ function modelController() {
   };
 
   // =============================
+  // LIST ALL STAFF (for dropdown)
+  // =============================
+  methods.listAllStaff = async (req, res) => {
+
+    try {
+
+      const filter = {
+        role: "staff",
+        removed: false,
+        enabled: true,
+      };
+
+      const staff = await Model.find(filter)
+        .select('name email phone')
+        .sort({ name: 1 });
+
+      res.status(200).json({
+        success: true,
+        result: staff,
+      });
+
+    } catch (error) {
+
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+
+    }
+  };
+
+  // =============================
   // UPDATE STAFF
   // =============================
   methods.updateStaff = async (req, res) => {

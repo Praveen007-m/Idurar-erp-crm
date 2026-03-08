@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { buildStaffFilter } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Invoice');
 
@@ -8,6 +9,9 @@ const paginatedList = async (req, res) => {
   const skip = page * limit - limit;
 
   const { sortBy = 'enabled', sortValue = -1, filter, equal } = req.query;
+
+  // Build staff filter - invoices are linked to clients
+  const staffFilter = await buildStaffFilter(req.admin, 'client');
 
   const fieldsArray = req.query.fields ? req.query.fields.split(',') : [];
 
@@ -22,7 +26,7 @@ const paginatedList = async (req, res) => {
   //  Query the database for a list of all results
   const resultsPromise = Model.find({
     removed: false,
-
+    ...staffFilter,
     [filter]: equal,
     ...fields,
   })
@@ -35,7 +39,7 @@ const paginatedList = async (req, res) => {
   // Counting the total documents
   const countPromise = Model.countDocuments({
     removed: false,
-
+    ...staffFilter,
     [filter]: equal,
     ...fields,
   });

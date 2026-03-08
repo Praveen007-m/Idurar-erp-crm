@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
+const { getStaffClientIds } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Invoice');
 
@@ -30,14 +31,35 @@ const summary = async (req, res) => {
 
   const statuses = ['draft', 'pending', 'overdue', 'paid', 'unpaid', 'partially'];
 
+  // Build staff filter - get client IDs assigned to staff
+  let clientFilter = {};
+  if (req.admin && req.admin.role === 'staff') {
+    const clientIds = await getStaffClientIds(req.admin);
+    if (!clientIds || clientIds.length === 0) {
+      // Staff has no assigned clients - return empty result
+      return res.status(200).json({
+        success: true,
+        result: {
+          total: 0,
+          total_undue: 0,
+          type,
+          performance: statuses.map((status) => ({
+            status,
+            count: 0,
+            percentage: 0,
+          })),
+        },
+        message: `Successfully found all invoices for the last ${defaultType}`,
+      });
+    }
+    clientFilter = { client: { $in: clientIds } };
+  }
+
   const response = await Model.aggregate([
     {
       $match: {
         removed: false,
-        // date: {
-        //   $gte: startDate.toDate(),
-        //   $lte: endDate.toDate(),
-        // },
+        ...clientFilter,
       },
     },
     {
@@ -134,14 +156,14 @@ const summary = async (req, res) => {
   const statusResultMap = statusResult.map((item) => {
     return {
       ...item,
-      percentage: Math.round((item.count / totalInvoices.count) * 100),
+      percentage: totalInvoices && totalInvoices.count > 0 ? Math.round((item.count / totalInvoices.count) * 100) : 0,
     };
   });
 
   const paymentStatusResultMap = paymentStatusResult.map((item) => {
     return {
       ...item,
-      percentage: Math.round((item.count / totalInvoices.count) * 100),
+      percentage: totalInvoices && totalInvoices.count > 0 ? Math.round((item.count / totalInvoices.count) * 100) : 0,
     };
   });
 
@@ -149,7 +171,7 @@ const summary = async (req, res) => {
     return {
       ...item,
       status: 'overdue',
-      percentage: Math.round((item.count / totalInvoices.count) * 100),
+      percentage: totalInvoices && totalInvoices.count > 0 ? Math.round((item.count / totalInvoices.count) * 100) : 0,
     };
   });
 
@@ -166,11 +188,7 @@ const summary = async (req, res) => {
     {
       $match: {
         removed: false,
-
-        // date: {
-        //   $gte: startDate.toDate(),
-        //   $lte: endDate.toDate(),
-        // },
+        ...clientFilter,
         paymentStatus: {
           $in: ['unpaid', 'partially'],
         },
@@ -195,7 +213,7 @@ const summary = async (req, res) => {
   ]);
 
   const finalResult = {
-    total: totalInvoices?.total,
+    total: totalInvoices?.total || 0,
     total_undue: unpaid.length > 0 ? unpaid[0].total_amount : 0,
     type,
     performance: result,

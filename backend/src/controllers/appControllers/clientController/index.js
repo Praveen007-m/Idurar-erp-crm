@@ -53,6 +53,7 @@ function modelController() {
       const skip = (page - 1) * limit;
 
       const result = await Model.find(filter)
+        .populate('assigned', 'name email')
         .skip(skip)
         .limit(limit)
         .sort({ created: -1 })
@@ -89,10 +90,15 @@ function modelController() {
         filter.assigned = req.admin._id;
       }
 
+      // If staff, prevent changing the assigned field
+      if (req.admin.role === "staff") {
+        delete req.body.assigned;
+      }
+
       const result = await Model.findOneAndUpdate(filter, req.body, {
         new: true,
         runValidators: true,
-      }).exec();
+      }).populate('assigned', 'name email').exec();
 
       if (!result) {
         return res.status(404).json({
@@ -159,6 +165,38 @@ function modelController() {
         success: true,
         result,
         message: 'Successfully deleted Client and associated repayments',
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        result: null,
+        message: 'Oops there is an Error',
+        error: err,
+      });
+    }
+  };
+
+  methods.read = async (req, res) => {
+    try {
+      const result = await Model.findOne({
+        _id: req.params.id,
+        removed: false,
+      })
+        .populate('assigned', 'name email')
+        .exec();
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          result: null,
+          message: 'No document found ',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        result,
+        message: 'we found this document ',
       });
     } catch (err) {
       return res.status(500).json({

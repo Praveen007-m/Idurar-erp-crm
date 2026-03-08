@@ -29,6 +29,10 @@ router.route('/admin/updateStaff/:id')
 router.route('/admin/deleteStaff/:id')
   .delete(catchErrors(adminController.deleteStaff));
 
+// List all staff (for dropdown)
+router.route('/admin/listAllStaff')
+  .get(catchErrors(adminController.listAllStaff));
+
 
 // =============================
 // GENERIC ENTITY ROUTES

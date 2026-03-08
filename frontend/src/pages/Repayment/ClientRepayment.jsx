@@ -13,6 +13,7 @@ import { ArrowLeftOutlined, EditOutlined, DeleteOutlined } from '@ant-design/ico
 import { ErpLayout } from '@/layout';
 import { Dropdown, Menu, Modal, Form, Input, Select, InputNumber, Button, DatePicker } from 'antd';
 import RepaymentForm from '@/forms/RepaymentForm';
+import { request } from '@/request';
 
 export default function ClientRepayment() {
     const { id } = useParams();
@@ -76,12 +77,19 @@ export default function ClientRepayment() {
         });
     };
 
-    const handleStatusChange = (record, newStatus) => {
+    const handleStatusChange = async (record, newStatus) => {
         const updatedItems = localRepayments.map((item) =>
             item._id === record._id ? { ...item, status: newStatus } : item
         );
         setLocalRepayments(updatedItems);
-        dispatch(crud.update({ entity: 'repayment', id: record._id, jsonData: { status: newStatus } }));
+        
+        // Update in database and wait for response
+        await dispatch(crud.update({ entity: 'repayment', id: record._id, jsonData: { status: newStatus } }));
+        
+        // Dispatch custom event to refresh the calendar view
+        window.dispatchEvent(new Event('repayment-updated'));
+        
+        // Refresh current client repayments
         setTimeout(fetchRepayments, 500);
     };
 

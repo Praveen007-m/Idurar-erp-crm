@@ -11,7 +11,7 @@ import useLanguage from '@/locale/useLanguage';
 import { Button, Form } from 'antd';
 import Loading from '@/components/Loading';
 
-export default function UpdateForm({ config, formElements, withUpload = false }) {
+export default function UpdateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
   const translate = useLanguage();
   const dispatch = useDispatch();
@@ -23,8 +23,12 @@ export default function UpdateForm({ config, formElements, withUpload = false })
 
   const { panel, collapsedBox, readBox } = crudContextAction;
 
-  const showCurrentRecord = () => {
-    readBox.open();
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      readBox.open();
+    }
   };
 
   /////
@@ -104,25 +108,7 @@ export default function UpdateForm({ config, formElements, withUpload = false })
     <div style={show}>
       <Loading isLoading={isLoading}>
         <Form form={form} layout="vertical" onFinish={onSubmit}>
-          {formElements}
-          <Form.Item
-            style={{
-              display: 'inline-block',
-              paddingRight: '5px',
-            }}
-          >
-            <Button type="primary" htmlType="submit">
-              {translate('Save')}
-            </Button>
-          </Form.Item>
-          <Form.Item
-            style={{
-              display: 'inline-block',
-              paddingLeft: '5px',
-            }}
-          >
-            <Button onClick={showCurrentRecord}>{translate('Cancel')}</Button>
-          </Form.Item>
+          {typeof formElements === 'function' ? formElements({ onCancel: handleCancel }) : formElements}
         </Form>
       </Loading>
     </div>

@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
+const { getStaffClientIds } = require('@/helpers/staffFilter');
 
 const Model = mongoose.model('Quote');
+const Client = mongoose.model('Client');
 const { loadSettings } = require('@/middlewares/settings');
 
 const summary = async (req, res) => {
@@ -29,15 +31,35 @@ const summary = async (req, res) => {
 
   const statuses = ['draft', 'pending', 'sent', 'expired', 'declined', 'accepted'];
 
+  // Build staff filter - get client IDs assigned to staff
+  let clientFilter = {};
+  if (req.admin && req.admin.role === 'staff') {
+    const clientIds = await getStaffClientIds(req.admin);
+    if (!clientIds || clientIds.length === 0) {
+      // Staff has no assigned clients - return empty result
+      return res.status(200).json({
+        success: true,
+        result: {
+          total: 0,
+          type: defaultType,
+          performance: statuses.map((status) => ({
+            status,
+            count: 0,
+            percentage: 0,
+            total_amount: 0,
+          })),
+        },
+        message: `Successfully found all Quotations for the last ${defaultType}`,
+      });
+    }
+    clientFilter = { client: { $in: clientIds } };
+  }
+
   const result = await Model.aggregate([
     {
       $match: {
         removed: false,
-
-        // date: {
-        //   $gte: startDate.toDate(),
-        //   $lte: endDate.toDate(),
-        // },
+        ...clientFilter,
       },
     },
     {
