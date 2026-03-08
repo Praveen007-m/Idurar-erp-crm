@@ -1,10 +1,41 @@
 const mongoose = require('mongoose');
 const createCRUDController = require('@/controllers/middlewaresControllers/createCRUDController');
 const { buildStaffFilter } = require('@/helpers/staffFilter');
+const { calculatePaymentStatus } = require('@/models/appModels/Repayment');
 
 function modelController() {
   const Model = mongoose.model('Repayment');
   const methods = createCRUDController('Repayment');
+
+  // Helper function to calculate and set payment status
+  const updatePaymentStatus = (repaymentData) => {
+    const paidAmount = repaymentData.amount || 0;
+    const installmentAmount = repaymentData.amount || 0;
+    const dueDate = repaymentData.date;
+    const paidDate = repaymentData.paidDate || null;
+
+    // Calculate paymentStatus based on payment details
+    const paymentStatus = calculatePaymentStatus(
+      paidAmount,
+      installmentAmount,
+      dueDate,
+      paidDate
+    );
+
+    // Also update legacy status field for backward compatibility
+    let status;
+    if (paymentStatus === 'paid' || paymentStatus === 'late') {
+      status = paymentStatus === 'late' ? 'late payment' : 'paid';
+    } else if (paymentStatus === 'partial') {
+      status = 'partial';
+    } else if (paymentStatus === 'default') {
+      status = 'not-paid';
+    } else {
+      status = 'not-paid';
+    }
+
+    return { ...repaymentData, paymentStatus, status };
+  };
 
   // Override list method with staff filtering
   methods.list = async (req, res) => {
@@ -131,7 +162,10 @@ function modelController() {
         }
       }
 
-      const result = await Model.create(req.body);
+      // Calculate payment status before creating
+      const repaymentDataWithStatus = updatePaymentStatus(req.body);
+
+      const result = await Model.create(repaymentDataWithStatus);
       return res.status(200).json({
         success: true,
         result,
@@ -168,6 +202,49 @@ function modelController() {
         });
       }
 
+      // Check if this is a status-only update (user manually changing status)
+      // Allow for both status AND paymentStatus to be sent together
+      const hasStatusField = req.body.status !== undefined;
+      const hasPaymentStatusField = req.body.paymentStatus !== undefined;
+      const onlyStatusFields = (hasStatusField || hasPaymentStatusField) && 
+                              Object.keys(req.body).every(key => key === 'status' || key === 'paymentStatus');
+
+      // If only updating status, don't recalculate - just save the manual status
+      if (onlyStatusFields) {
+        const manualStatus = req.body.status || req.body.paymentStatus;
+        
+        const result = await Model.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            removed: false,
+            ...staffFilter,
+          },
+          { 
+            status: manualStatus,
+            paymentStatus: manualStatus,
+            updated: new Date() 
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        ).populate().exec();
+
+        if (!result) {
+          return res.status(404).json({
+            success: false,
+            result: null,
+            message: 'No document found',
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          result,
+          message: 'Successfully updated Repayment',
+        });
+      }
+
       // If updating date or client, find and update all duplicates
       const { date, client } = req.body;
       
@@ -197,14 +274,20 @@ function modelController() {
         }
       }
 
+      // Calculate payment status before updating (for non-status-only updates)
+      const repaymentDataWithStatus = updatePaymentStatus({
+        ...existingRepayment.toObject(),
+        ...req.body
+      });
+
       const result = await Model.findOneAndUpdate(
         {
           _id: req.params.id,
           removed: false,
           ...staffFilter,
-        },
+        }, 
         { 
-          ...req.body,
+          ...repaymentDataWithStatus,
           updated: new Date() 
         },
         {

@@ -74,6 +74,16 @@ export default function RepaymentForm({ isUpdateForm = false }) {
             </Form.Item>
 
             <Form.Item
+                label={translate('Payment Date')}
+                name="paidDate"
+                getValueProps={(value) => ({
+                    value: value ? dayjs(value) : undefined,
+                })}
+            >
+                <DatePicker style={{ width: '100%' }} format={dateFormat} placeholder={translate('select_payment_date')} />
+            </Form.Item>
+
+            <Form.Item
                 label={translate('Status')}
                 name="status"
                 rules={[{ required: true }]}
@@ -82,8 +92,10 @@ export default function RepaymentForm({ isUpdateForm = false }) {
                 <Select
                     options={[
                         { value: 'paid', label: translate('paid') },
-                        { value: 'not-paid', label: translate('not-paid') },
-                        { value: 'late payment', label: translate('late payment') },
+                        { value: 'late', label: translate('late') },
+                        { value: 'partial', label: translate('partial') },
+                        { value: 'default', label: translate('default') },
+                        { value: 'not_started', label: translate('not_started') },
                     ]}
                 />
             </Form.Item>

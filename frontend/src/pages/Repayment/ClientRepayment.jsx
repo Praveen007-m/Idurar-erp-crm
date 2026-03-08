@@ -77,14 +77,17 @@ export default function ClientRepayment() {
         });
     };
 
-    const handleStatusChange = async (record, newStatus) => {
+const handleStatusChange = async (record, newStatus) => {
+        // Use the new status directly (no legacy mapping needed)
+        const paymentStatus = newStatus;
+
         const updatedItems = localRepayments.map((item) =>
-            item._id === record._id ? { ...item, status: newStatus } : item
+            item._id === record._id ? { ...item, status: newStatus, paymentStatus } : item
         );
         setLocalRepayments(updatedItems);
         
         // Update in database and wait for response
-        await dispatch(crud.update({ entity: 'repayment', id: record._id, jsonData: { status: newStatus } }));
+        await dispatch(crud.update({ entity: 'repayment', id: record._id, jsonData: { status: newStatus, paymentStatus } }));
         
         // Dispatch custom event to refresh the calendar view
         window.dispatchEvent(new Event('repayment-updated'));
@@ -124,8 +127,10 @@ export default function ClientRepayment() {
                         menu={{
                             items: [
                                 { key: 'paid', label: translate('paid') },
-                                { key: 'not-paid', label: translate('not-paid') },
-                                { key: 'late payment', label: translate('late payment') },
+                                { key: 'late', label: translate('late') },
+                                { key: 'partial', label: translate('partial') },
+                                { key: 'default', label: translate('default') },
+                                { key: 'not_started', label: translate('not_started') },
                             ],
                             onClick: ({ key }) => handleStatusChange(record, key),
                         }}

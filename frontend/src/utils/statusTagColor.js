@@ -25,6 +25,13 @@ const colors = [
   { value: 'not-paid', label: 'not-paid', color: 'red', icon: '❌' },
   { value: 'late payment', label: 'late payment', color: 'gold', icon: '⏰' },
 
+  // New payment status colors for loan repayment calendar
+  { value: 'paid', label: 'paid', color: 'green', icon: '💳' }, // #52c41a
+  { value: 'late', label: 'Late Payment', color: 'gold', icon: '⏰' }, // #faad14
+  { value: 'partial', label: 'Partial Payment', color: 'orange', icon: '💵' }, // #fa8c16
+  { value: 'default', label: 'Default', color: 'red', icon: '🚫' }, // #ff4d4f
+  { value: 'not_started', label: 'Not Started', color: 'default', icon: '⏳' }, // #d9d9d9
+
   { value: 'processing', label: 'processing', color: 'geekblue', icon: '⌛' },
   { value: 'packing', label: 'packing', color: 'orange', icon: '📦' },
   { value: 'shipped', label: 'shipped', color: 'purple', icon: '✈️' },

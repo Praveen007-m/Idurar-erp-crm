@@ -49,11 +49,11 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
   const show = isReadBoxOpen || isEditBoxOpen ? { opacity: 1 } : { opacity: 0 };
   return (
     <>
-      <Row style={show} gutter={(24, 24)}>
-        <Col span={10}>
+      <Row style={show} gutter={[24, 24]}>
+        <Col xs={24} md={10}>
           <p style={{ marginBottom: '10px' }}>{labels}</p>
         </Col>
-        <Col span={14}>
+        <Col xs={24} md={14}>
           <Button
             onClick={removeItem}
             type="text"
@@ -96,10 +96,10 @@ function FixHeaderPanel({ config }) {
 
   return (
     <Row gutter={8}>
-      <Col className="gutter-row" span={21}>
+      <Col className="gutter-row" xs={20} sm={21}>
         <SearchItem config={config} />
       </Col>
-      <Col className="gutter-row" span={3}>
+      <Col className="gutter-row" xs={4} sm={3}>
         <Button onClick={addNewItem} block={true} icon={<PlusOutlined />}></Button>
       </Col>
     </Row>

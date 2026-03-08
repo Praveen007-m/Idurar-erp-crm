@@ -1,7 +1,9 @@
-import { notification } from 'antd';
+import { getNotification } from './notificationInstance';
 import codeMessage from './codeMessage';
 
 const errorHandler = (error) => {
+  const notification = getNotification();
+  
   if (!navigator.onLine) {
     notification.config({
       duration: 15,
@@ -101,3 +103,4 @@ const errorHandler = (error) => {
 };
 
 export default errorHandler;
+

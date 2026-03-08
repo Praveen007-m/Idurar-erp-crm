@@ -44,6 +44,38 @@
   background-color: transparent;
 }
 
+/* Tablet breakpoint */
+@media only screen and (min-width: 769px) and (max-width: 1024px) {
+  .navigation {
+    width: 80px !important;
+  }
+  
+  .logo {
+    width: 50px;
+    margin: 15px auto 30px;
+    justify-content: center;
+  }
+  
+  .logo > img {
+    margin: 0;
+  }
+  
+  .logo > div {
+    display: none;
+  }
+  
+  .ant-menu-item,
+  .ant-menu-submenu-title {
+    padding: 0 12px !important;
+  }
+  
+  .ant-menu-item .ant-menu-title-content,
+  .ant-menu-submenu-title .ant-menu-title-content {
+    display: none;
+  }
+}
+
+/* Mobile breakpoint */
 @media only screen and (max-width: 768px) {
   .sidebar-wraper {
     display: none;
@@ -51,6 +83,7 @@
 
   .navigation {
     height: 100%;
+    width: 100% !important;
   }
 
   /* .ant-btn.mobile-sidebar-btn {
@@ -61,5 +94,14 @@
 
   .mobile-sidebar-wraper {
     display: block;
+  }
+  
+  /* Make sure the mobile sidebar drawer works properly */
+  .mobile-sidebar-wraper .ant-drawer-content-wrapper {
+    width: 280px !important;
+  }
+  
+  .mobile-sidebar-wraper .ant-drawer-body {
+    padding: 0 !important;
   }
 }

@@ -43,12 +43,13 @@ const BOX_BG = '#e9f7f8';
 const BOX_TEXT = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
 
-const STATUS_COLOR = {
-  pending: "#d9d9d9",      // grey
-  paid: "#52c41a",         // green
-  late: "#faad14",         // yellow
-  overdue: "#ff4d4f",      // red
-  "not-paid": "#ff4d4f"    // red - same as overdue for unpaid status
+// New payment status colors
+const statusColors = {
+  paid: "#52c41a",        // green - The installment amount is fully paid
+  late: "#faad14",        // yellow - Payment was made after the due date
+  partial: "#fa8c16",     // orange - Customer paid part of the installment but not full
+  default: "#ff4d4f",     // red - Payment is overdue and no payment has been made
+  not_started: "#d9d9d9"  // grey - Repayment date has not yet started
 };
 
 export default function Repayment() {
@@ -191,7 +192,7 @@ export default function Repayment() {
     }
   };
 
-  const repaymentMap = useMemo(() => {
+const repaymentMap = useMemo(() => {
     const map = new Map();
 
     if (!repayments || !Array.isArray(repayments)) return map;
@@ -199,13 +200,16 @@ export default function Repayment() {
     repayments.forEach((item) => {
       const clientId = item.client?._id || item.client;
       const key = `${clientId}-${dayjs(item.date).format("YYYY-MM-DD")}`;
-      map.set(key, item.status);
+      // Use paymentStatus field first, fallback to legacy status field
+      const status = item.paymentStatus || item.status;
+      map.set(key, status);
     });
 
     return map;
   }, [repayments]);
 
-const getPaymentStatus = useCallback((client, date) => {
+  // Calculate payment status based on date and repayment data
+  const getPaymentStatus = useCallback((client, date) => {
     const key = `${client._id}-${date.format("YYYY-MM-DD")}`;
     const repaymentStatus = repaymentMap.get(key);
     
@@ -215,23 +219,33 @@ const getPaymentStatus = useCallback((client, date) => {
     // If explicitly marked as paid, return green
     if (repaymentStatus === "paid") return "paid";
     
-    // If explicitly marked as late payment, return late (yellow)
-    if (repaymentStatus === "late payment") return "late";
+    // If explicitly marked as late payment, return yellow
+    if (repaymentStatus === "late") return "late";
     
-    // If explicitly marked as not-paid, check date for red (overdue) or grey (upcoming)
+    // If explicitly marked as partial payment, return orange
+    if (repaymentStatus === "partial") return "partial";
+    
+    // If explicitly marked as default (overdue with no payment), return red
+    if (repaymentStatus === "default") return "default";
+    
+    // If explicitly marked as not_started, return grey
+    if (repaymentStatus === "not_started") return "not_started";
+    
+    // Legacy status handling for backward compatibility
+    if (repaymentStatus === "late payment") return "late";
     if (repaymentStatus === "not-paid") {
       if (currentDate.isBefore(today)) {
-        return "overdue"; // Red - overdue unpaid
+        return "default"; // Red - overdue unpaid
       }
-      return "pending"; // Grey - upcoming unpaid
+      return "not_started"; // Grey - upcoming unpaid
     }
     
     // Fallback for missing explicit status - use date-based logic
     if (currentDate.isBefore(today)) {
-      return "overdue";
+      return "default";
     }
 
-    return "pending";
+    return "not_started";
   }, [repaymentMap]);
 
   const openDuesModal = async (client) => {
@@ -255,7 +269,7 @@ const getPaymentStatus = useCallback((client, date) => {
   const dueAmount = Math.max(totalRepayment - paidAmount, 0);
   const totalDueClients = Object.values(clientsByDay).reduce((count, dayItems) => count + dayItems.length, 0);
 
-  const repaymentColumns = [
+const repaymentColumns = [
     {
       title: translate('Date'),
       dataIndex: 'date',
@@ -271,7 +285,13 @@ const getPaymentStatus = useCallback((client, date) => {
       dataIndex: 'status',
       render: (value) => {
         let color = 'default';
+        // Handle new paymentStatus values
         if (value === 'paid') color = 'green';
+        else if (value === 'late') color = 'gold';
+        else if (value === 'partial') color = 'orange';
+        else if (value === 'default') color = 'red';
+        else if (value === 'not_started') color = 'default';
+        // Legacy status handling
         else if (value === 'not-paid') color = 'red';
         else if (value === 'late payment') color = 'gold';
 
@@ -293,29 +313,31 @@ const getPaymentStatus = useCallback((client, date) => {
         }
         ghost={false}
         extra={[
-          <Input
-            key="search-clients"
-            allowClear
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={translate('search')}
-            value={searchTerm}
-            style={{ width: 210 }}
-          />,
-          <Select
-            key="status-filter"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 150 }}
-            options={[
-              { label: translate('all'), value: 'all' },
-              { label: translate('active'), value: 'active' },
-              { label: translate('paid'), value: 'paid' },
-              { label: translate('defaulted'), value: 'defaulted' },
-            ]}
-          />,
-          <Button key="refresh-clients" icon={<RedoOutlined />} onClick={loadClients}>
-            {translate('Refresh')}
-          </Button>,
+          <div key="search-filter-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <Input
+              key="search-clients"
+              allowClear
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={translate('search')}
+              value={searchTerm}
+              style={{ width: '100%', minWidth: 150, maxWidth: 210 }}
+            />
+            <Select
+              key="status-filter"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              style={{ width: '100%', minWidth: 100, maxWidth: 150 }}
+              options={[
+                { label: translate('all'), value: 'all' },
+                { label: translate('active'), value: 'active' },
+                { label: translate('paid'), value: 'paid' },
+                { label: translate('defaulted'), value: 'defaulted' },
+              ]}
+            />
+            <Button key="refresh-clients" icon={<RedoOutlined />} onClick={loadClients}>
+              {translate('Refresh')}
+            </Button>
+          </div>,
         ]}
         style={{
           padding: '18px 14px',
@@ -363,77 +385,94 @@ const getPaymentStatus = useCallback((client, date) => {
         </Row>
 
         <Card bordered={false} style={{ borderRadius: 12 }}>
-          {/* Legend */}
-          <Row
-            gutter={16}
+          {/* Legend - Scrollable on mobile */}
+          <div
+            className="legend-container"
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
               marginBottom: 20,
               background: "#fafafa",
-              padding: "10px 16px",
+              padding: "12px 16px",
               borderRadius: 6,
-              border: "1px solid #f0f0f0"
+              border: "1px solid #f0f0f0",
+              flexWrap: 'wrap',
+              gap: '12px 16px',
+              width: '100%',
+              overflowX: 'auto'
             }}
           >
-            <Col>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 14,
-                    height: 14,
-                    background: "#52c41a",
-                    borderRadius: 3,
-                    display: "inline-block"
-                  }}
-                />
-                Paid
-              </span>
-            </Col>
+            {/* Paid */}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: statusColors.paid,
+                  borderRadius: 3,
+                  display: "inline-block"
+                }}
+              />
+               Paid
+            </span>
 
-            <Col>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 14,
-                    height: 14,
-                    background: "#faad14",
-                    borderRadius: 3,
-                    display: "inline-block"
-                  }}
-                />
-                Pending
-              </span>
-            </Col>
+            {/* Late Payment */}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: statusColors.late,
+                  borderRadius: 3,
+                  display: "inline-block"
+                }}
+              />
+               Late Payment
+            </span>
 
-            <Col>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 14,
-                    height: 14,
-                    background: "#ff4d4f",
-                    borderRadius: 3,
-                    display: "inline-block"
-                  }}
-                />
-                Overdue
-              </span>
-            </Col>
+            {/* Pending Payment */}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: statusColors.partial,
+                  borderRadius: 3,
+                  display: "inline-block"
+                }}
+              />
+               Pending Payment
+            </span>
 
-            <Col>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 14,
-                    height: 14,
-                    background: "#d9d9d9",
-                    borderRadius: 3,
-                    display: "inline-block"
-                  }}
-                />
-                Defaulted
-              </span>
-            </Col>
-          </Row>
+            {/* Default */}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: statusColors.default,
+                  borderRadius: 3,
+                  display: "inline-block"
+                }}
+              />
+               Default
+            </span>
+
+            {/* Not Started */}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: statusColors.not_started,
+                  borderRadius: 3,
+                  display: "inline-block"
+                }}
+              />
+               Not Started
+            </span>
+          </div>
           <Calendar
             value={calendarMonth}
             onPanelChange={(value) => setCalendarMonth(value)}
@@ -467,12 +506,12 @@ const getPaymentStatus = useCallback((client, date) => {
                       />
                     ) : null}
                   </div>
-                  <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 8 }}>
+<Space direction="vertical" size={4} style={{ width: '100%', marginTop: 8 }}>
                     {visible.map((client) => {
                       const status = getPaymentStatus(client, date);
-                      const bgColor = STATUS_COLOR[status];
+                      const bgColor = statusColors[status];
                       
-                      const textColor = (status === 'pending' || status === 'late') 
+                      const textColor = (status === 'not_started' || status === 'partial' || status === 'late') 
                         ? 'rgba(0, 0, 0, 0.88)' 
                         : '#ffffff';
 
@@ -516,7 +555,7 @@ const getPaymentStatus = useCallback((client, date) => {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         footer={null}
-        width={800}
+        width={window.innerWidth < 768 ? '95%' : 800}
         style={{ top: 24 }}
         title={
           <Space>

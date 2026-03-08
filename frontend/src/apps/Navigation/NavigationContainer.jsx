@@ -157,7 +157,8 @@ function Sidebar({ collapsible, isMobile = false }) {
       collapsed={collapsible ? isNavMenuClose : collapsible}
       onCollapse={onCollapse}
       className="navigation"
-      width={256}
+      width={isMobile ? 250 : 256}
+      breakpoint="lg"
       style={{
         overflow: 'auto',
         height: '100vh',

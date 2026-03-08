@@ -155,14 +155,14 @@ export default function DashboardModule() {
         </Row>
         <div className="space30"></div>
         <Row gutter={[32, 32]}>
-          <Col className="gutter-row w-full" sm={{ span: 24 }} md={{ span: 24 }} lg={{ span: 18 }}>
-            <div className="whiteBox shadow" style={{ height: 458 }}>
+          <Col className="gutter-row w-full" xs={24} sm={24} md={24} lg={18}>
+            <div className="whiteBox shadow" style={{ minHeight: 458 }}>
               <Row className="pad20" gutter={[0, 0]}>
                 {statisticCards}
               </Row>
             </div>
           </Col>
-          <Col className="gutter-row w-full" sm={{ span: 24 }} md={{ span: 24 }} lg={{ span: 6 }}>
+          <Col className="gutter-row w-full" xs={24} sm={24} md={24} lg={6}>
             <CustomerPreviewCard
               isLoading={clientLoading}
               activeCustomer={clientResult?.active}
@@ -172,7 +172,7 @@ export default function DashboardModule() {
         </Row>
         <div className="space30"></div>
         <Row gutter={[32, 32]}>
-          <Col className="gutter-row w-full" sm={{ span: 24 }} lg={{ span: 12 }}>
+          <Col className="gutter-row w-full" xs={24} lg={12}>
             <div className="whiteBox shadow pad20" style={{ height: '100%' }}>
               <h3 style={{ color: '#22075e', marginBottom: 5, padding: '0 20px 20px' }}>
                 {translate('Recent Invoices')}
@@ -182,7 +182,7 @@ export default function DashboardModule() {
             </div>
           </Col>
 
-          <Col className="gutter-row w-full" sm={{ span: 24 }} lg={{ span: 12 }}>
+          <Col className="gutter-row w-full" xs={24} lg={12}>
             <div className="whiteBox shadow pad20" style={{ height: '100%' }}>
               <h3 style={{ color: '#22075e', marginBottom: 5, padding: '0 20px 20px' }}>
                 {translate('Recent Quotes')}

@@ -184,32 +184,37 @@ export default function DataTable({ config, extra = [] }) {
         title={DATATABLE_TITLE}
         ghost={false}
         extra={[
-          <Input
-            key={`searchFilterDataTable}`}
-            onChange={filterTable}
-            placeholder={translate('search')}
-            allowClear
-          />,
-          <Button onClick={handelDataTableLoad} key={`${uniqueId()}`} icon={<RedoOutlined />}>
-            {translate('Refresh')}
-          </Button>,
+          <div key="datatable-search-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
+            <Input
+              key={`searchFilterDataTable}`}
+              onChange={filterTable}
+              placeholder={translate('search')}
+              allowClear
+              style={{ minWidth: '150px', maxWidth: '250px', width: '100%' }}
+            />
+            <Button onClick={handelDataTableLoad} key={`${uniqueId()}`} icon={<RedoOutlined />}>
+              {translate('Refresh')}
+            </Button>
 
-          <AddNewItem key={`${uniqueId()}`} config={config} />,
+            <AddNewItem key={`${uniqueId()}`} config={config} />
+          </div>,
         ]}
         style={{
           padding: '20px 0px',
         }}
       ></PageHeader>
 
-      <Table
-        columns={dataTableColumns}
-        rowKey={(item) => item._id}
-        dataSource={dataSource}
-        pagination={pagination}
-        loading={listIsLoading}
-        onChange={handelDataTableLoad}
-        scroll={{ x: true }}
-      />
+      <div className="table-responsive-wrapper">
+        <Table
+          columns={dataTableColumns}
+          rowKey={(item) => item._id}
+          dataSource={dataSource}
+          pagination={pagination}
+          loading={listIsLoading}
+          onChange={handelDataTableLoad}
+          scroll={{ x: 'max-content' }}
+        />
+      </div>
     </>
   );
 }

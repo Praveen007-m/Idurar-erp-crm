@@ -11,10 +11,12 @@ import { selectCurrentAdmin } from '@/redux/auth/selectors';
 import { FILE_BASE_URL } from '@/config/serverApiConfig';
 
 import useLanguage from '@/locale/useLanguage';
+import useResponsive from '@/hooks/useResponsive';
 
 export default function HeaderContent() {
   const currentAdmin = useSelector(selectCurrentAdmin);
   const { Header } = Layout;
+  const { isMobile } = useResponsive();
 
   const translate = useLanguage();
 
@@ -85,12 +87,13 @@ export default function HeaderContent() {
   return (
     <Header
       style={{
-        padding: '20px',
+        padding: isMobile ? '12px 16px' : '20px',
         background: '#ffffff',
         display: 'flex',
-        flexDirection: 'row-reverse',
-        justifyContent: 'flex-start',
-        gap: ' 15px',
+        flexDirection: isMobile ? 'column' : 'row-reverse',
+        justifyContent: isMobile ? 'flex-start' : 'flex-start',
+        gap: isMobile ? '8px' : '15px',
+        alignItems: 'center',
       }}
     >
       <Dropdown
