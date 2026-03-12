@@ -110,7 +110,6 @@ function modelController() {
 
   methods.list = async (req, res) => {
     try {
-
       let filter = { removed: false };
 
       if (req.admin.role === "staff") {
