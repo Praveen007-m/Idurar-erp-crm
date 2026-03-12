@@ -19,8 +19,10 @@ export const fields = {
         type: 'select',
         options: [
             { value: 'paid', label: 'paid', color: 'green' },
-            { value: 'not-paid', label: 'not-paid', color: 'red' },
-            { value: 'late payment', label: 'late_payment', color: 'orange' },
+            { value: 'not_started', label: 'not_started', color: 'default' },
+            { value: 'default', label: 'default', color: 'red' },
+            { value: 'late', label: 'late', color: 'gold' },
+            { value: 'partial', label: 'partial', color: 'orange' },
         ],
     },
     notes: {

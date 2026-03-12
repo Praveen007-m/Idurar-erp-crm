@@ -1,50 +1,58 @@
 const mongoose = require('mongoose');
 
-/**
- * Helper function to calculate payment status based on payment details
- * @param {Number} paidAmount - The amount that has been paid
- * @param {Number} installmentAmount - The total installment amount due
- * @param {Date} dueDate - The due date of the installment
- * @param {Date} paidDate - The date when payment was made (optional)
- * @returns {String} paymentStatus - one of: paid, late, partial, default, not_started
- */
-const calculatePaymentStatus = (paidAmount, installmentAmount, dueDate, paidDate = null) => {
-  const today = new Date();
-  const due = new Date(dueDate);
-  
-  // Set times to midnight for date-only comparison
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
+const normalizeNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
-  // If paidAmount equals or exceeds installmentAmount
-  if (paidAmount >= installmentAmount) {
-    // Check if paid after due date
-    if (paidDate) {
-      const paid = new Date(paidDate);
-      paid.setHours(0, 0, 0, 0);
-      if (paid > due) {
-        return 'late';
-      }
-    }
-    return 'paid';
-  }
+const normalizeStatus = (status) => {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
 
-  // If paidAmount is greater than 0 but less than installmentAmount (partial payment)
-  if (paidAmount > 0 && paidAmount < installmentAmount) {
-    return 'partial';
-  }
-
-  // If paidAmount is 0
-  if (paidAmount === 0) {
-    // Check if due date has passed
-    if (today > due) {
-      return 'default';
-    }
-    // If due date is in the future
+  if (normalizedStatus === 'not-started' || normalizedStatus === 'not started') {
     return 'not_started';
   }
 
-  // Default fallback
+  if (normalizedStatus === 'late payment') {
+    return 'late';
+  }
+
+  return normalizedStatus;
+};
+
+const computeBalance = (doc = {}) =>
+  Math.max(0, normalizeNumber(doc.amount) - normalizeNumber(doc.amountPaid));
+
+const computeStatus = (doc = {}) => {
+  const today = new Date();
+  const dueDate = doc.date ? new Date(doc.date) : new Date();
+  const paidAmount = normalizeNumber(doc.amountPaid);
+  const totalAmount = normalizeNumber(doc.amount);
+  const paymentDate = doc.paymentDate || doc.paidDate || null;
+
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+
+  if (paidAmount >= totalAmount && totalAmount > 0) {
+    if (paymentDate) {
+      const normalizedPaymentDate = new Date(paymentDate);
+      normalizedPaymentDate.setHours(0, 0, 0, 0);
+
+      if (normalizedPaymentDate > dueDate) {
+        return 'late';
+      }
+    }
+
+    return 'paid';
+  }
+
+  if (paidAmount > 0) {
+    return 'partial';
+  }
+
+  if (today > dueDate) {
+    return 'default';
+  }
+
   return 'not_started';
 };
 
@@ -68,6 +76,17 @@ const repaymentSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  amountPaid: {
+    type: Number,
+    default: 0,
+  },
+  balance: {
+    type: Number,
+    default: 0,
+  },
+  remainingBalance: {
+    type: Number,
+  },
   principal: {
     type: Number,
     default: 0,
@@ -76,19 +95,15 @@ const repaymentSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  // Status field - now using consistent values
   status: {
     type: String,
-    enum: ['paid', 'late', 'partial', 'default', 'not_started'],
+    enum: ['paid', 'default', 'late', 'partial', 'not_started'],
     default: 'not_started',
   },
-  // New paymentStatus field with more granular statuses
-  paymentStatus: {
-    type: String,
-    enum: ['paid', 'late', 'partial', 'default', 'not_started'],
-    default: 'not_started',
+  paymentDate: {
+    type: Date,
+    default: null,
   },
-  // Track the date when payment was made
   paidDate: {
     type: Date,
     default: null,
@@ -107,61 +122,72 @@ const repaymentSchema = new mongoose.Schema({
   },
 });
 
-// Middleware to auto-calculate paymentStatus before saving
-// Only auto-calculate if status is NOT manually set (empty/null)
-repaymentSchema.pre('save', function(next) {
-  const paidAmount = this.amount || 0;
-  const installmentAmount = this.amount || 0;
-  
-  // Calculate paymentStatus based on payment details
-  this.paymentStatus = calculatePaymentStatus(
-    paidAmount,
-    installmentAmount,
-    this.date,
-    this.paidDate
-  );
+repaymentSchema.pre('init', function (doc) {
+  this._original = doc;
+});
 
-  // Only auto-calculate status if it's empty or null (manual override)
-  // If status was manually set, preserve it
-  if (!this.status) {
-    this.status = this.paymentStatus;
+repaymentSchema.pre('save', function(next) {
+  if (!this.isNew && this._original?.status === 'paid' && this.isModified()) {
+    return next(new Error('Paid repayments cannot be modified'));
+  }
+
+  this.amountPaid = normalizeNumber(this.amountPaid);
+  this.balance = computeBalance(this);
+  this.remainingBalance = this.balance;
+  this.status = computeStatus(this);
+
+  if (this.paymentDate && !this.paidDate) {
+    this.paidDate = this.paymentDate;
   }
 
   this.updated = new Date();
   next();
 });
 
-// Also handle findOneAndUpdate to preserve manually set status
-repaymentSchema.pre('findOneAndUpdate', function(next) {
-  // Get the update object
-  const update = this.getUpdate();
-  
-  // If status OR paymentStatus is being explicitly set in the update, don't override
-  // We only calculate if neither is in the update
-  if (update.status === undefined && update.paymentStatus === undefined) {
-    const paidAmount = update.amount || 0;
-    const installmentAmount = update.amount || update.installmentAmount || 0;
-    
-    // Get the date from update or use current
-    const date = update.date ? new Date(update.date) : new Date();
-    const paidDate = update.paidDate ? new Date(update.paidDate) : null;
-    
-    // Calculate and set status only if not manually set
-    const calculatedStatus = calculatePaymentStatus(
-      paidAmount,
-      installmentAmount,
-      date,
-      paidDate
-    );
-    
-    this.set({ paymentStatus: calculatedStatus });
+repaymentSchema.pre('findOneAndUpdate', async function(next) {
+  try {
+    const update = this.getUpdate() || {};
+    const nextUpdate = update.$set ? { ...update.$set } : { ...update };
+    const currentDocument = await this.model.findOne(this.getQuery()).lean();
+
+    if (nextUpdate.paymentDate && !nextUpdate.paidDate) {
+      nextUpdate.paidDate = nextUpdate.paymentDate;
+    }
+
+    const mergedUpdate = {
+      ...(currentDocument || {}),
+      ...nextUpdate,
+    };
+
+    if (normalizeStatus(currentDocument?.status) === 'paid') {
+      return next(new Error('Paid repayments cannot be modified'));
+    }
+
+    mergedUpdate.amountPaid = normalizeNumber(mergedUpdate.amountPaid);
+    mergedUpdate.balance = computeBalance(mergedUpdate);
+    mergedUpdate.remainingBalance = mergedUpdate.balance;
+    nextUpdate.amountPaid = mergedUpdate.amountPaid;
+    nextUpdate.balance = mergedUpdate.balance;
+    nextUpdate.remainingBalance = mergedUpdate.remainingBalance;
+    nextUpdate.status = computeStatus(mergedUpdate);
+
+    nextUpdate.updated = new Date();
+
+    if (update.$set) {
+      this.setUpdate({ ...update, $set: nextUpdate });
+    } else {
+      this.setUpdate(nextUpdate);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-  
-  this.set({ updated: new Date() });
-  next();
 });
 
 repaymentSchema.plugin(require('mongoose-autopopulate'));
 
 module.exports = mongoose.model('Repayment', repaymentSchema);
-module.exports.calculatePaymentStatus = calculatePaymentStatus;
+module.exports.calculateStatus = computeStatus;
+module.exports.computeStatus = computeStatus;
+module.exports.computeBalance = computeBalance;

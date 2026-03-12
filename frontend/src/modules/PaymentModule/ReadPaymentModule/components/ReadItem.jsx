@@ -18,11 +18,12 @@ import { generate as uniqueId } from 'shortid';
 
 import { selectCurrentItem } from '@/redux/erp/selectors';
 
-import { DOWNLOAD_BASE_URL } from '@/config/serverApiConfig';
 import { useMoney } from '@/settings';
+import { notification } from 'antd';
 
 import useMail from '@/hooks/useMail';
 import { useNavigate } from 'react-router-dom';
+import { downloadPaymentPdf } from '@/utils/downloadPaymentPdf';
 
 export default function ReadItem({ config, selectedItem }) {
   const translate = useLanguage();
@@ -91,11 +92,14 @@ export default function ReadItem({ config, selectedItem }) {
           </Button>,
           <Button
             key={`${uniqueId()}`}
-            onClick={() => {
-              window.open(
-                `${DOWNLOAD_BASE_URL}${entity}/${entity}-${currentErp._id}.pdf`,
-                '_blank'
-              );
+            onClick={async () => {
+              try {
+                await downloadPaymentPdf(currentErp._id);
+              } catch (error) {
+                notification.error({
+                  message: error.message || 'Failed to download payment pdf',
+                });
+              }
             }}
             icon={<FilePdfOutlined />}
           >

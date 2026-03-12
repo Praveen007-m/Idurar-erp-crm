@@ -5,10 +5,6 @@ const errorHandler = (error) => {
   const notification = getNotification();
   
   if (!navigator.onLine) {
-    notification.config({
-      duration: 15,
-      maxCount: 1,
-    });
     // Code to execute when there is internet connection
     notification.error({
       message: 'No internet connection',
@@ -24,10 +20,6 @@ const errorHandler = (error) => {
   const { response } = error;
 
   if (!response) {
-    notification.config({
-      duration: 20,
-      maxCount: 1,
-    });
     // Code to execute when there is no internet connection
     // notification.error({
     //   message: 'Problem connecting to server',
@@ -56,10 +48,6 @@ const errorHandler = (error) => {
 
     const errorText = message || codeMessage[response.status];
     const { status, error } = response;
-    notification.config({
-      duration: 20,
-      maxCount: 2,
-    });
     notification.error({
       message: `Request error ${status}`,
       description: errorText,
@@ -71,10 +59,6 @@ const errorHandler = (error) => {
       window.location.href = '/logout';
     } else return response.data;
   } else {
-    notification.config({
-      duration: 15,
-      maxCount: 1,
-    });
 
     if (navigator.onLine) {
       // Code to execute when there is internet connection

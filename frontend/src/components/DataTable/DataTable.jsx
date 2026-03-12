@@ -81,6 +81,8 @@ export default function DataTable({ config, extra = [] }) {
     collapsedBox.open();
   }
   function handleDelete(record) {
+    console.log('🚀 ~ handleDelete record:', record);
+    console.log('🚀 ~ handleDelete _id:', record._id);
     dispatch(crud.currentAction({ actionType: 'delete', data: record }));
     modal.open();
   }
@@ -156,10 +158,14 @@ export default function DataTable({ config, extra = [] }) {
 
   const dispatch = useDispatch();
 
-  const handelDataTableLoad = useCallback((pagination) => {
-    const options = { page: pagination.current || 1, items: pagination.pageSize || 10 };
+  const handelDataTableLoad = useCallback((pagination, filters, sorter, extraInfo) => {
+    if (extraInfo?.action && extraInfo.action !== 'paginate') {
+      return;
+    }
+
+    const options = { page: pagination?.current || 1, items: pagination?.pageSize || 10 };
     dispatch(crud.list({ entity, options }));
-  }, []);
+  }, [dispatch, entity]);
 
   const filterTable = (e) => {
     const value = e.target.value;

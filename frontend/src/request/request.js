@@ -32,9 +32,9 @@ const request = {
     try {
       includeToken();
       const response = await axios.post(entity + '/create', jsonData);
-      successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+successHandler(response, {
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -50,8 +50,8 @@ const request = {
         },
       });
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -76,8 +76,8 @@ const request = {
       includeToken();
       const response = await axios.patch(entity + '/update/' + id, jsonData);
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -93,8 +93,8 @@ const request = {
         },
       });
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -105,13 +105,16 @@ const request = {
   delete: async ({ entity, id }) => {
     try {
       includeToken();
+      console.log('🚀 ~ request.delete URL:', entity + '/delete/' + id);
       const response = await axios.delete(entity + '/delete/' + id);
+      console.log('🚀 ~ request.delete response:', response.data);
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
+      console.error('❌ request.delete error:', error);
       return errorHandler(error);
     }
   },
@@ -220,8 +223,8 @@ const request = {
       includeToken();
       const response = await axios.patch(entity, jsonData);
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -238,8 +241,8 @@ const request = {
         },
       });
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {
@@ -279,8 +282,8 @@ const request = {
       includeToken();
       const response = await axios.post(entity + '/mail/', jsonData);
       successHandler(response, {
-        notifyOnSuccess: true,
-        notifyOnFailed: true,
+        notifyOnSuccess: false,
+        notifyOnFailed: false,
       });
       return response.data;
     } catch (error) {

@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 const createCRUDController = require('@/controllers/middlewaresControllers/createCRUDController');
 const { buildStaffFilter } = require('@/helpers/staffFilter');
+const customPdf = require('@/controllers/pdfController');
 
 const create = require('./create');
 const summary = require('./summary');
@@ -15,53 +18,58 @@ function modelController() {
   // Override list method with staff filtering
   methods.list = async (req, res) => {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.items) || 10;
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.items, 10) || 10;
       const skip = page * limit - limit;
 
       const { sortBy = 'created', sortValue = -1, filter, equal } = req.query;
 
-      // Build staff filter - payments are linked to clients through invoice
       const staffFilter = await buildStaffFilter(req.admin, 'client');
-
       const fieldsArray = req.query.fields ? req.query.fields.split(',') : [];
 
-      let fields;
-      fields = fieldsArray.length === 0 ? {} : { $or: [] };
+      let fields = fieldsArray.length === 0 ? {} : { $or: [] };
 
       for (const field of fieldsArray) {
         fields.$or.push({ [field]: { $regex: new RegExp(req.query.q, 'i') } });
       }
 
-      // Query the database for a list of all results
-      const resultsPromise = Model.find({
+      let filterQuery = {
         removed: false,
-        ...staffFilter,
-        [filter]: equal,
         ...fields,
-      })
+      };
+
+      if (filter && equal) {
+        filterQuery = {
+          ...filterQuery,
+          [filter]: equal,
+        };
+      }
+
+      filterQuery = {
+        ...filterQuery,
+        ...staffFilter,
+      };
+
+      const resultsPromise = Model.find(filterQuery)
         .skip(skip)
         .limit(limit)
         .sort({ [sortBy]: sortValue })
         .populate()
         .exec();
 
-      // Counting the total documents
-      const countPromise = Model.countDocuments({
-        removed: false,
-        ...staffFilter,
-        [filter]: equal,
-        ...fields,
-      });
+      const countPromise = Model.countDocuments(filterQuery);
 
-      // Resolving both promises
       const [result, count] = await Promise.all([resultsPromise, countPromise]);
 
-      // Calculating total pages
       const pages = Math.ceil(count / limit);
-
-      // Getting Pagination Object
       const pagination = { page, pages, count };
+
+      console.log('[paymentController.list] payment list response', {
+        count,
+        page,
+        limit,
+      });
+
       if (count > 0) {
         return res.status(200).json({
           success: true,
@@ -69,20 +77,20 @@ function modelController() {
           pagination,
           message: 'Successfully found all documents',
         });
-      } else {
-        return res.status(203).json({
-          success: true,
-          result: [],
-          pagination,
-          message: 'Collection is Empty',
-        });
       }
+
+      return res.status(203).json({
+        success: true,
+        result: [],
+        pagination,
+        message: 'Collection is Empty',
+      });
     } catch (error) {
       return res.status(500).json({
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
       });
     }
   };
@@ -199,6 +207,62 @@ function modelController() {
         result: null,
         message: error.message,
         error: error,
+      });
+    }
+  };
+
+  methods.download = async (req, res) => {
+    try {
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
+
+      const result = await Model.findOne({
+        _id: req.params.id,
+        removed: false,
+        ...staffFilter,
+      })
+        .populate()
+        .exec();
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          result: null,
+          message: 'Payment not found',
+        });
+      }
+
+      const fileId = `payment-${result._id}.pdf`;
+      const targetDirectory = path.join(process.cwd(), 'src', 'public', 'download', 'payment');
+      const targetLocation = path.join(targetDirectory, fileId);
+
+      fs.mkdirSync(targetDirectory, { recursive: true });
+
+      await customPdf.generatePdf(
+        'Payment',
+        { filename: 'payment', format: 'A4', targetLocation },
+        result,
+        async () => {
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename=${fileId}`);
+
+          return res.download(targetLocation, fileId, (error) => {
+            if (error && !res.headersSent) {
+              return res.status(500).json({
+                success: false,
+                result: null,
+                message: "Couldn't download payment pdf",
+                error: error.message,
+              });
+            }
+          });
+        }
+      );
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        result: null,
+        message: error.message,
+        error,
       });
     }
   };

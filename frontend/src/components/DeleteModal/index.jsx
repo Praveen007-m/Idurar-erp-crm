@@ -7,11 +7,12 @@ import { useCrudContext } from '@/context/crud';
 import { useAppContext } from '@/context/appContext';
 import { selectDeletedItem } from '@/redux/crud/selectors';
 import { valueByString } from '@/utils/helpers';
-
 import useLanguage from '@/locale/useLanguage';
+import useResponsive from '@/hooks/useResponsive';
 
 export default function DeleteModal({ config }) {
   const translate = useLanguage();
+  const { screens } = useResponsive();
   let {
     entity,
     deleteModalLabels,
@@ -19,7 +20,8 @@ export default function DeleteModal({ config }) {
     modalTitle = translate('delete_confirmation'),
   } = config;
   const dispatch = useDispatch();
-  const { current, isLoading, isSuccess } = useSelector(selectDeletedItem);
+  const deleteState = useSelector(selectDeletedItem);
+  const { current, isLoading, isSuccess } = deleteState;
   const { state, crudContextAction } = useCrudContext();
   const { appContextAction } = useAppContext();
   const { panel, readBox } = crudContextAction;
@@ -30,7 +32,6 @@ export default function DeleteModal({ config }) {
 
   useEffect(() => {
     if (isSuccess) {
-      console.log('🚀 ~ useEffect ~ DeleteModal isSuccess:', isSuccess);
       modal.close();
       dispatch(crud.list({ entity }));
       // dispatch(crud.resetAction({actionType:"delete"})); // check here maybe it wrong
@@ -48,7 +49,10 @@ export default function DeleteModal({ config }) {
     readBox.close();
     modal.close();
     panel.close();
-    navMenu.collapse();
+    // Only collapse sidebar on mobile (screens.md is true for desktop >= 768px)
+    if (!screens.md) {
+      navMenu.collapse();
+    }
   };
   const handleCancel = () => {
     if (!isLoading) modal.close();

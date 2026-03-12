@@ -9,6 +9,7 @@ import SelectAsync from '@/components/SelectAsync';
 import { generate as uniqueId } from 'shortid';
 
 import { countryList } from '@/utils/countryList';
+import { handlePhoneInput, handlePhoneKeyPress, handlePhonePaste } from '@/utils/helpers';
 
 export default function DynamicForm({ fields, isUpdateForm = false }) {
   const [feedback, setFeedback] = useState();
@@ -302,7 +303,17 @@ function FormElement({ field, feedback, setFeedback }) {
     textarea: <TextArea rows={4} />,
     email: <Input autoComplete="off" placeholder="email@example.com" />,
     number: <InputNumber style={{ width: '100%' }} />,
-    phone: <Input style={{ width: '100%' }} placeholder="+1 123 456 789" />,
+    phone: (
+      <Input
+        style={{ width: '100%' }}
+        placeholder="Enter mobile number"
+        maxLength={10}
+        inputMode="numeric"
+        onInput={handlePhoneInput}
+        onKeyPress={handlePhoneKeyPress}
+        onPaste={handlePhonePaste}
+      />
+    ),
     boolean: (
       <Switch
         checkedChildren={<CheckOutlined />}

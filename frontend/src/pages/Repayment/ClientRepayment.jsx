@@ -1,19 +1,69 @@
 import { useParams } from 'react-router-dom';
-import { Tag, Row, Col, Card, Statistic, Table, Divider } from 'antd';
+import { notification } from 'antd';
+import { Tag, Row, Col, Card, Table, Dropdown, Modal, Form } from 'antd';
 import { PageHeader } from '@ant-design/pro-layout';
 import dayjs from 'dayjs';
-import { tagColor } from '@/utils/statusTagColor';
 import { useMoney, useDate } from '@/settings';
 import useLanguage from '@/locale/useLanguage';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { crud } from '@/redux/crud/actions';
 import { selectListItems, selectReadItem } from '@/redux/crud/selectors';
+import { erp } from '@/redux/erp/actions';
 import { ArrowLeftOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { ErpLayout } from '@/layout';
-import { Dropdown, Menu, Modal, Form, Input, Select, InputNumber, Button, DatePicker } from 'antd';
 import RepaymentForm from '@/forms/RepaymentForm';
-import { request } from '@/request';
+
+const normalizeRepaymentStatus = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+
+    if (normalizedStatus === 'late payment') return 'late';
+    if (normalizedStatus === 'not-paid' || normalizedStatus === 'not paid') return 'default';
+    if (normalizedStatus === 'not_started' || normalizedStatus === 'not started') return 'not-started';
+
+    return normalizedStatus || 'not-started';
+};
+
+const STATUS_COLORS = {
+    paid: 'green',
+    late: 'gold',
+    partial: 'orange',
+    default: 'red',
+    'not-started': 'default',
+};
+
+const STATUS_LABELS = {
+    paid: 'Paid',
+    late: 'Late Payment',
+    partial: 'Partial',
+    default: 'Default',
+    'not-started': 'Not Started',
+};
+
+const allowedTransitions = {
+    paid: [],
+    'not-started': ['paid', 'default', 'partial'],
+    partial: ['paid'],
+    default: ['paid', 'partial'],
+    late: [],
+};
+
+const getDisplayStatus = (item) => {
+    const today = new Date();
+    const due = new Date(item?.date);
+    const status = normalizeRepaymentStatus(item?.status);
+
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+
+    if (status === 'paid') return 'paid';
+    if (status === 'late') return 'late';
+    if (status === 'partial') return 'partial';
+
+    if (today < due) return 'not-started';
+
+    return 'default';
+};
 
 export default function ClientRepayment() {
     const { id } = useParams();
@@ -30,6 +80,35 @@ export default function ClientRepayment() {
     const [form] = Form.useForm();
     const [localRepayments, setLocalRepayments] = useState([]);
 
+    const formatRepaymentPayload = (values) => ({
+        ...values,
+        amountPaid:
+            (values.status === 'paid' || values.status === 'late') && !values.amountPaid
+                ? values.amount
+                : values.amountPaid,
+        date: values.date ? dayjs(values.date).toISOString() : undefined,
+        paymentDate:
+            values.paymentDate
+                ? dayjs(values.paymentDate).toISOString()
+                : values.status === 'paid' || values.status === 'late'
+                    ? new Date().toISOString()
+                    : null,
+    });
+
+    const mergeRepaymentIntoState = (repayment) => {
+        setLocalRepayments((prev) =>
+            prev.map((item) =>
+                item._id === repayment._id
+                    ? {
+                        ...item,
+                        ...repayment,
+                        client: repayment.client || item.client,
+                    }
+                    : item
+            )
+        );
+    };
+
     useEffect(() => {
         if (repaymentsResult?.items) {
             setLocalRepayments(repaymentsResult.items);
@@ -39,7 +118,7 @@ export default function ClientRepayment() {
     useEffect(() => {
         dispatch(crud.read({ entity: 'client', id }));
         fetchRepayments();
-    }, [id]);
+    }, [dispatch, id]);
 
     const fetchRepayments = () => {
         dispatch(crud.list({ entity: 'repayment', options: { filter: 'client', equal: id, items: 100 } }));
@@ -49,7 +128,11 @@ export default function ClientRepayment() {
         setCurrentRepayment(record);
         form.setFieldsValue({
             ...record,
-            date: dayjs(record.date),
+            status: normalizeRepaymentStatus(record.status),
+            _originalStatus: normalizeRepaymentStatus(record.status),
+            date: record.date ? dayjs(record.date) : null,
+            paymentDate: record.paidDate ? dayjs(record.paidDate) : (record.paymentDate ? dayjs(record.paymentDate) : null),
+            amountPaid: record.amountPaid ?? 0,
         });
         setIsModalOpen(true);
     };
@@ -57,43 +140,84 @@ export default function ClientRepayment() {
     const handleDelete = (record) => {
         Modal.confirm({
             title: translate('Are you sure you want to delete this repayment?'),
-            onOk: () => {
-                dispatch(crud.delete({ entity: 'repayment', id: record._id }));
-                setTimeout(fetchRepayments, 500);
+            onOk: async () => {
+                await dispatch(crud.delete({ entity: 'repayment', id: record._id }));
+                fetchRepayments();
             },
         });
     };
 
-    const handleModalOk = () => {
-        form.validateFields().then((values) => {
-            const updatedItems = localRepayments.map((item) =>
-                item._id === currentRepayment._id ? { ...item, ...values } : item
+    const handleModalOk = async () => {
+        try {
+            const values = await form.validateFields();
+            const response = await dispatch(
+                crud.update({
+                    entity: 'repayment',
+                    id: currentRepayment._id,
+                    jsonData: formatRepaymentPayload(values),
+                })
             );
-            setLocalRepayments(updatedItems);
 
-            dispatch(crud.update({ entity: 'repayment', id: currentRepayment._id, jsonData: values }));
-            setIsModalOpen(false);
-            setTimeout(fetchRepayments, 500);
-        });
+            if (response?.success || response?.result) {
+                mergeRepaymentIntoState(response.result);
+                dispatch(crud.list({ entity: 'payment' }));
+                dispatch(erp.list({ entity: 'payment' }));
+                dispatch(crud.list({ entity: 'repayment', options: { filter: 'client', equal: id, items: 100 } }));
+                setIsModalOpen(false);
+                setCurrentRepayment(null);
+                form.resetFields();
+                window.dispatchEvent(new Event('payment-updated'));
+
+                notification.success({
+                    message: translate('Repayment updated successfully'),
+                });
+                return;
+            }
+
+            notification.error({
+                message: translate('Update failed'),
+                description: response?.message || translate('Something went wrong'),
+            });
+        } catch (error) {
+            notification.error({
+                message: translate('Update failed'),
+                description: error.message || translate('Something went wrong'),
+            });
+        }
     };
 
-const handleStatusChange = async (record, newStatus) => {
-        // Use the new status directly (no legacy mapping needed)
-        const paymentStatus = newStatus;
+    const handleStatusChange = async (record, newStatus) => {
+        mergeRepaymentIntoState({ ...record, status: newStatus });
 
-        const updatedItems = localRepayments.map((item) =>
-            item._id === record._id ? { ...item, status: newStatus, paymentStatus } : item
+        const response = await dispatch(
+            crud.update({
+                entity: 'repayment',
+                id: record._id,
+                jsonData: {
+                    status: newStatus,
+                    amountPaid:
+                        newStatus === 'paid' || newStatus === 'late' ? record.amount : record.amountPaid,
+                    paymentDate:
+                        newStatus === 'paid' || newStatus === 'late' ? new Date().toISOString() : null,
+                },
+            })
         );
-        setLocalRepayments(updatedItems);
-        
-        // Update in database and wait for response
-        await dispatch(crud.update({ entity: 'repayment', id: record._id, jsonData: { status: newStatus, paymentStatus } }));
-        
-        // Dispatch custom event to refresh the calendar view
+
+        if (response?.success || response?.result) {
+            mergeRepaymentIntoState(response.result);
+            dispatch(crud.list({ entity: 'payment' }));
+            dispatch(erp.list({ entity: 'payment' }));
+            dispatch(crud.list({ entity: 'repayment', options: { filter: 'client', equal: id, items: 100 } }));
+            window.dispatchEvent(new Event('payment-updated'));
+        } else {
+            mergeRepaymentIntoState(record);
+            notification.error({
+                message: translate('Update failed'),
+                description: response?.message || translate('Something went wrong'),
+            });
+        }
+
         window.dispatchEvent(new Event('repayment-updated'));
-        
-        // Refresh current client repayments
-        setTimeout(fetchRepayments, 500);
     };
 
     const dataTableColumns = [
@@ -120,24 +244,23 @@ const handleStatusChange = async (record, newStatus) => {
         {
             title: translate('Status'),
             dataIndex: 'status',
-            render: (status, record) => {
-                let color = tagColor(status)?.color;
+            render: (value, record) => {
+                const displayStatus = getDisplayStatus({ ...record, status: value || record.status });
+                const color = STATUS_COLORS[displayStatus] || STATUS_COLORS['not-started'];
+
                 return (
                     <Dropdown
                         menu={{
-                            items: [
-                                { key: 'paid', label: translate('paid') },
-                                { key: 'late', label: translate('late') },
-                                { key: 'partial', label: translate('partial') },
-                                { key: 'default', label: translate('default') },
-                                { key: 'not_started', label: translate('not_started') },
-                            ],
+                            items: (allowedTransitions[displayStatus] || []).map((key) => ({
+                                key,
+                                label: key === 'not-started' ? 'Not Started' : translate(key),
+                            })),
                             onClick: ({ key }) => handleStatusChange(record, key),
                         }}
-                        trigger={['click']}
+                        trigger={(allowedTransitions[displayStatus] || []).length > 0 ? ['contextMenu'] : []}
                     >
-                        <Tag color={color} style={{ cursor: 'pointer' }}>
-                            {translate(status)}
+                        <Tag color={color} style={{ cursor: (allowedTransitions[displayStatus] || []).length > 0 ? 'pointer' : 'default' }}>
+                            {STATUS_LABELS[displayStatus] || displayStatus.replace('-', ' ').toUpperCase()}
                         </Tag>
                     </Dropdown>
                 );

@@ -106,9 +106,37 @@ export function formatDatetime(param) {
 }
 
 /*
-  Regex to validate phone number format
+  Regex and helpers to validate Indian-style 10 digit mobile number format
 */
-export const validatePhoneNumber = /^(?:[+\d()\-\s]+)$/;
+export const validatePhoneNumber = /^[6-9]\d{9}$/;
+
+export const sanitizePhoneNumber = (value = '') => value.toString().replace(/\D/g, '').slice(0, 10);
+
+export const handlePhoneInput = (event) => {
+  let value = sanitizePhoneNumber(event?.target?.value);
+
+  if (value.length === 1 && !/[6-9]/.test(value)) {
+    value = '';
+  }
+
+  if (event?.target) {
+    event.target.value = value;
+  }
+};
+
+export const handlePhoneKeyPress = (event) => {
+  if (!/[0-9]/.test(event.key)) {
+    event.preventDefault();
+  }
+};
+
+export const handlePhonePaste = (event) => {
+  const pasted = sanitizePhoneNumber(event.clipboardData.getData('Text'));
+
+  if (!/^[6-9]\d{0,9}$/.test(pasted)) {
+    event.preventDefault();
+  }
+};
 
 /*
  Set object value in html

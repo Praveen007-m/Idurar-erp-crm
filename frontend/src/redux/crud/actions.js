@@ -172,11 +172,14 @@ export const crud = {
           payload: null,
         });
       }
+
+      return data;
     },
 
   delete:
     ({ entity, id }) =>
     async (dispatch) => {
+      console.log('🚀 ~ crud.delete called with entity:', entity, 'id:', id);
       dispatch({
         type: actionTypes.RESET_ACTION,
         keyState: 'delete',
@@ -188,6 +191,7 @@ export const crud = {
       });
 
       let data = await request.delete({ entity, id });
+      console.log('🚀 ~ crud.delete response:', data);
 
       if (data.success === true) {
         dispatch({

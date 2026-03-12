@@ -5,15 +5,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { crud } from '@/redux/crud/actions';
 import { useCrudContext } from '@/context/crud';
 import { selectUpdatedItem } from '@/redux/crud/selectors';
-
-import useLanguage from '@/locale/useLanguage';
-
-import { Button, Form } from 'antd';
+import { Form } from 'antd';
 import Loading from '@/components/Loading';
 
 export default function UpdateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
-  const translate = useLanguage();
   const dispatch = useDispatch();
   const { current, isLoading, isSuccess } = useSelector(selectUpdatedItem);
 
@@ -92,12 +88,21 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
 
   useEffect(() => {
     if (isSuccess) {
-      readBox.open();
-      collapsedBox.open();
-      panel.open();
-      form.resetFields();
-      dispatch(crud.resetAction({ actionType: 'update' }));
       dispatch(crud.list({ entity }));
+
+      if (config.closePanelOnSuccess) {
+        form.resetFields();
+        readBox.close();
+        collapsedBox.close();
+        panel.close();
+      } else {
+        readBox.open();
+        collapsedBox.open();
+        panel.open();
+        form.resetFields();
+      }
+
+      dispatch(crud.resetAction({ actionType: 'update' }));
     }
   }, [isSuccess]);
 
@@ -108,7 +113,9 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
     <div style={show}>
       <Loading isLoading={isLoading}>
         <Form form={form} layout="vertical" onFinish={onSubmit}>
-          {typeof formElements === 'function' ? formElements({ onCancel: handleCancel }) : formElements}
+          {typeof formElements === 'function'
+            ? formElements({ onCancel: handleCancel, loading: isLoading, isUpdateForm: true })
+            : formElements}
         </Form>
       </Loading>
     </div>

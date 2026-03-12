@@ -4,12 +4,45 @@ const createCRUDController = require('@/controllers/middlewaresControllers/creat
 const summary = require('./summary');
 const generateInstallments = require('./generateInstallments');
 
+const calculateClientEndDate = ({ startDate, term, repaymentType }) => {
+  const normalizedStart = new Date(startDate);
+  const parsedTerm = Number.parseInt(term, 10);
+
+  if (Number.isNaN(normalizedStart.getTime())) {
+    throw new Error('Invalid startDate');
+  }
+
+  if (!Number.isFinite(parsedTerm) || parsedTerm <= 0) {
+    throw new Error('Invalid term');
+  }
+
+  const normalizedRepaymentType = String(repaymentType || '').toLowerCase();
+  const endDate = new Date(normalizedStart);
+
+  if (normalizedRepaymentType === 'weekly') {
+    endDate.setDate(endDate.getDate() + parsedTerm * 7);
+  } else if (normalizedRepaymentType === 'daily') {
+    endDate.setDate(endDate.getDate() + parsedTerm);
+  } else if (normalizedRepaymentType === 'monthly emi' || normalizedRepaymentType === 'monthly') {
+    endDate.setMonth(endDate.getMonth() + parsedTerm);
+  } else {
+    throw new Error('Invalid repaymentType');
+  }
+
+  if (endDate <= normalizedStart) {
+    throw new Error('Ending Date must be after Start Date');
+  }
+
+  return endDate;
+};
+
 function modelController() {
   const Model = mongoose.model('Client');
   const methods = createCRUDController('Client');
 
   methods.create = async (req, res) => {
     try {
+      delete req.body.endDate;
 
       // If logged in user is staff assign client automatically
       if (req.admin.role === "staff") {
@@ -18,14 +51,50 @@ function modelController() {
         req.body.assigned = req.admin._id;
       }
 
+      try {
+        req.body.endDate = calculateClientEndDate({
+          startDate: req.body.startDate,
+          term: req.body.term,
+          repaymentType: req.body.repaymentType,
+        });
+      } catch (validationError) {
+        return res.status(422).json({
+          success: false,
+          result: null,
+          message: validationError.message,
+        });
+      }
+
       const result = await Model.create(req.body);
 
-      // Generate installments automatically
-      await generateInstallments(result);
+      // Generate installments automatically (non-blocking)
+      // We use a separate try/catch so that if installment generation fails,
+      // the client creation still succeeds and returns 200
+      try {
+        console.log('[Client Create] Generating installments for client:', result._id);
+        console.log('[Client Create] Client loan details:', {
+          loanAmount: result.loanAmount,
+          interestRate: result.interestRate,
+          term: result.term,
+          startDate: result.startDate,
+          repaymentType: result.repaymentType,
+          interestType: result.interestType
+        });
+        
+        await generateInstallments(result);
+        console.log('[Client Create] Installments generated successfully');
+      } catch (installmentError) {
+        // Log the error but don't fail the client creation
+        console.error('[Client Create] Error generating installments:', installmentError.message);
+        console.error('[Client Create] Stack trace:', installmentError.stack);
+      }
+
+      // Convert Mongoose document to plain object to avoid circular references
+      const clientData = result.toObject();
 
       return res.status(200).json({
         success: true,
-        result,
+        result: clientData,
         message: "Successfully created Client",
       });
 
@@ -94,13 +163,11 @@ function modelController() {
       if (req.admin.role === "staff") {
         delete req.body.assigned;
       }
+      delete req.body.endDate;
 
-      const result = await Model.findOneAndUpdate(filter, req.body, {
-        new: true,
-        runValidators: true,
-      }).populate('assigned', 'name email').exec();
+      const existingClient = await Model.findOne(filter).exec();
 
-      if (!result) {
+      if (!existingClient) {
         return res.status(404).json({
           success: false,
           result: null,
@@ -108,21 +175,60 @@ function modelController() {
         });
       }
 
-      // Check if loan-related fields changed
       const loanFieldsChanged = ['loanAmount', 'interestRate', 'term', 'startDate', 'repaymentType', 'interestType'].some(
         (field) => req.body[field] !== undefined
       );
 
+      const shouldRecalculateEndDate =
+        req.body.term !== undefined ||
+        req.body.startDate !== undefined ||
+        req.body.repaymentType !== undefined ||
+        !existingClient.endDate;
+
+      if (shouldRecalculateEndDate) {
+        const payloadWithExisting = {
+          ...existingClient.toObject(),
+          ...req.body,
+        };
+
+        try {
+          req.body.endDate = calculateClientEndDate({
+            startDate: payloadWithExisting.startDate,
+            term: payloadWithExisting.term,
+            repaymentType: payloadWithExisting.repaymentType,
+          });
+        } catch (validationError) {
+          return res.status(422).json({
+            success: false,
+            result: null,
+            message: validationError.message,
+          });
+        }
+      }
+
+      const result = await Model.findOneAndUpdate(filter, req.body, {
+        new: true,
+        runValidators: true,
+      }).populate('assigned', 'name email').exec();
+
       if (loanFieldsChanged) {
         // Delete existing unpaid installments and regenerate
         const Repayment = mongoose.model('Repayment');
-        await Repayment.deleteMany({ client: result._id, status: 'not-paid' });
-        await generateInstallments(result);
+        await Repayment.deleteMany({ client: result._id, status: 'default' });
+        // Non-blocking installment generation
+        try {
+          await generateInstallments(result);
+        } catch (installmentError) {
+          console.error('Error regenerating installments:', installmentError.message);
+        }
       }
+
+      // Convert to plain object to avoid circular references
+      const clientData = result.toObject();
 
       return res.status(200).json({
         success: true,
-        result,
+        result: clientData,
         message: 'Successfully updated Client and regenerated installments if needed',
       });
     } catch (err) {
@@ -161,9 +267,12 @@ function modelController() {
       const Repayment = mongoose.model('Repayment');
       await Repayment.updateMany({ client: result._id }, { removed: true });
 
+      // Convert to plain object to avoid circular references
+      const deletedData = result.toObject();
+
       return res.status(200).json({
         success: true,
-        result,
+        result: deletedData,
         message: 'Successfully deleted Client and associated repayments',
       });
     } catch (err) {

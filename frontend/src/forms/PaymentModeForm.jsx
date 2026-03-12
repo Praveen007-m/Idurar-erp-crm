@@ -1,9 +1,9 @@
 import React from 'react';
-import { Switch, Form, Input } from 'antd';
+import { Switch, Form, Input, Button, Space } from 'antd';
 import { CloseOutlined, CheckOutlined } from '@ant-design/icons';
 import useLanguage from '@/locale/useLanguage';
 
-export default function PaymentModeForm({ isUpdateForm = false }) {
+export default function PaymentModeForm({ isUpdateForm = false, onCancel, loading = false }) {
   const translate = useLanguage();
   return (
     <>
@@ -16,7 +16,7 @@ export default function PaymentModeForm({ isUpdateForm = false }) {
           },
         ]}
       >
-        <Input />
+        <Input placeholder="e.g., UPI, Bank Transfer" />
       </Form.Item>
       <Form.Item
         label={translate('Description')}
@@ -27,7 +27,7 @@ export default function PaymentModeForm({ isUpdateForm = false }) {
           },
         ]}
       >
-        <Input />
+        <Input.TextArea />
       </Form.Item>
 
       <Form.Item
@@ -54,6 +54,15 @@ export default function PaymentModeForm({ isUpdateForm = false }) {
         valuePropName="checked"
       >
         <Switch checkedChildren={<CheckOutlined />} unCheckedChildren={<CloseOutlined />} />
+      </Form.Item>
+
+      <Form.Item style={{ marginTop: 24, marginBottom: 0 }}>
+        <Space>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            {isUpdateForm ? 'Update Payment Mode' : 'Save Payment Mode'}
+          </Button>
+        </Space>
       </Form.Item>
     </>
   );

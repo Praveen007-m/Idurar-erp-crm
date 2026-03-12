@@ -3,11 +3,30 @@ import useLanguage from '@/locale/useLanguage';
 import PaymentDataTableModule from '@/modules/PaymentModule/PaymentDataTableModule';
 
 import { useMoney, useDate } from '@/settings';
+import { useDispatch } from 'react-redux';
+import { useEffect } from 'react';
+import { erp } from '@/redux/erp/actions';
 
 export default function Payment() {
   const translate = useLanguage();
   const { dateFormat } = useDate();
   const { moneyFormatter } = useMoney();
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const loadPayments = () => {
+      console.log('[PaymentPage] loading payment list');
+      dispatch(erp.list({ entity: 'payment' }));
+    };
+
+    loadPayments();
+    window.addEventListener('payment-updated', loadPayments);
+
+    return () => {
+      window.removeEventListener('payment-updated', loadPayments);
+    };
+  }, [dispatch]);
+
   const searchConfig = {
     entity: 'client',
     displayLabels: ['number'],
@@ -58,7 +77,12 @@ export default function Payment() {
     },
     {
       title: translate('Payment Mode'),
-      dataIndex: ['paymentMode', 'name'],
+      dataIndex: 'paymentMode',
+      render: (paymentMode) => {
+        if (!paymentMode) return '-';
+        if (typeof paymentMode === 'string') return paymentMode;
+        return paymentMode.name || '-';
+      },
     },
   ];
 

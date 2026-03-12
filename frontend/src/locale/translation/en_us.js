@@ -468,6 +468,11 @@ const lang = {
   total: 'Total',
   per_month: 'per month',
   'not-paid': 'Not Paid',
+  'not_started': 'Not Started',
+  'not-started': 'Not Started',
+  'default': 'Default',
+  'late': 'Late Payment',
+  'partial': 'Partial',
   'late payment': 'Late Payment',
 };
 

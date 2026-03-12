@@ -4,10 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { crud } from '@/redux/crud/actions';
 import { useCrudContext } from '@/context/crud';
 import { selectCreatedItem } from '@/redux/crud/selectors';
-
-import useLanguage from '@/locale/useLanguage';
-
-import { Button, Form } from 'antd';
+import { Form } from 'antd';
 import Loading from '@/components/Loading';
 
 export default function CreateForm({ config, formElements, withUpload = false, onCancel }) {
@@ -17,7 +14,19 @@ export default function CreateForm({ config, formElements, withUpload = false, o
   const { crudContextAction } = useCrudContext();
   const { panel, collapsedBox, readBox } = crudContextAction;
   const [form] = Form.useForm();
-  const translate = useLanguage();
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+
+    form.resetFields();
+    readBox.close();
+    collapsedBox.close();
+    panel.close();
+  };
+
   const onSubmit = (fieldsValue) => {
     // Manually trim values before submission
 
@@ -35,19 +44,30 @@ export default function CreateForm({ config, formElements, withUpload = false, o
 
   useEffect(() => {
     if (isSuccess) {
-      readBox.open();
-      collapsedBox.open();
-      panel.open();
-      form.resetFields();
-      dispatch(crud.resetAction({ actionType: 'create' }));
       dispatch(crud.list({ entity }));
+
+      if (config.closePanelOnSuccess) {
+        form.resetFields();
+        readBox.close();
+        collapsedBox.close();
+        panel.close();
+      } else {
+        readBox.open();
+        collapsedBox.open();
+        panel.open();
+        form.resetFields();
+      }
+
+      dispatch(crud.resetAction({ actionType: 'create' }));
     }
   }, [isSuccess]);
 
   return (
     <Loading isLoading={isLoading}>
       <Form form={form} layout="vertical" onFinish={onSubmit}>
-        {typeof formElements === 'function' ? formElements({ onCancel }) : formElements}
+        {typeof formElements === 'function'
+          ? formElements({ onCancel: handleCancel, loading: isLoading, isUpdateForm: false })
+          : formElements}
       </Form>
     </Loading>
   );

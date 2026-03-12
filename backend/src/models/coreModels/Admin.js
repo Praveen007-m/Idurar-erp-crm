@@ -34,7 +34,9 @@ const adminSchema = new mongoose.Schema(
 
     phone: {
       type: String,
+      required: true,
       trim: true,
+      set: (value) => value?.toString().replace(/\D/g, '').slice(0, 10),
       match: [/^[6-9]\d{9}$/, "Please enter a valid mobile number"],
     },
 

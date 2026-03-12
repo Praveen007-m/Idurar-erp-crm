@@ -1,3 +1,38 @@
+import dayjs from 'dayjs';
+
+const calculateFallbackEndDate = (startDate, term, repaymentType) => {
+  if (!startDate || !term || !repaymentType) return null;
+
+  const start = dayjs(startDate);
+  const parsedTerm = Number.parseInt(term, 10);
+  const normalizedRepaymentType = String(repaymentType).toLowerCase();
+
+  if (!start.isValid() || !Number.isFinite(parsedTerm) || parsedTerm <= 0) return null;
+
+  if (normalizedRepaymentType === 'weekly') {
+    return start.add(parsedTerm, 'week');
+  }
+
+  if (normalizedRepaymentType === 'daily') {
+    return start.add(parsedTerm, 'day');
+  }
+
+  if (normalizedRepaymentType === 'monthly emi' || normalizedRepaymentType === 'monthly') {
+    return start.add(parsedTerm, 'month');
+  }
+
+  return null;
+};
+
+const getComputedEndDate = (record) => {
+  if (record?.endDate) {
+    const stored = dayjs(record.endDate);
+    if (stored.isValid()) return stored;
+  }
+
+  return calculateFallbackEndDate(record?.startDate, record?.term, record?.repaymentType);
+};
+
 export const fields = {
   name: {
     type: 'string',
@@ -22,6 +57,22 @@ export const fields = {
   },
   startDate: {
     type: 'date',
+  },
+  endDate: {
+    label: 'Ending Date',
+    render: (_, record) => {
+      const endDate = getComputedEndDate(record);
+      return endDate ? endDate.format('DD/MM/YYYY') : '-';
+    },
+    sorter: (a, b) => {
+      const aEndDate = getComputedEndDate(a);
+      const bEndDate = getComputedEndDate(b);
+
+      const aValue = aEndDate ? aEndDate.valueOf() : 0;
+      const bValue = bEndDate ? bEndDate.valueOf() : 0;
+
+      return aValue - bValue;
+    },
   },
   repaymentType: {
     type: 'select',

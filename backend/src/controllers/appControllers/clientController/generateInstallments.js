@@ -1,68 +1,105 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
 
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+
+const roundCurrency = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
+
 const generateInstallments = async (client) => {
     const Repayment = mongoose.model('Repayment');
-    const { loanAmount, interestRate, term, startDate, repaymentType, interestType } = client;
+    const {
+        _id: clientId,
+        loanAmount,
+        interestRate,
+        term,
+        startDate,
+        repaymentType,
+        interestType,
+        createdBy,
+    } = client;
 
-    if (!loanAmount || !interestRate || !term || !repaymentType) return;
+    if (!clientId) {
+        throw new Error('[generateInstallments] Client id is required.');
+    }
 
-    const installments = [];
-    const numUnits = parseInt(term);
-    if (isNaN(numUnits)) return;
+    const missing = [];
+    if (!hasValue(loanAmount)) missing.push('loanAmount');
+    if (!hasValue(interestRate)) missing.push('interestRate');
+    if (!hasValue(term)) missing.push('term');
+    if (!hasValue(repaymentType)) missing.push('repaymentType');
+    if (!hasValue(startDate)) missing.push('startDate');
 
-    const P = loanAmount;
-    const monthlyRate = interestRate / 100;
+    if (missing.length > 0) {
+        throw new Error(
+            `[generateInstallments] Missing required fields for client ${clientId}: ${missing.join(', ')}.`
+        );
+    }
+
+    const existingRepayments = await Repayment.countDocuments({
+        client: clientId,
+        removed: false,
+    });
+
+    if (existingRepayments > 0) {
+        return [];
+    }
+
+    const installmentCount = Number.parseInt(term, 10);
+    if (!Number.isFinite(installmentCount) || installmentCount <= 0) {
+        throw new Error(`[generateInstallments] Invalid term "${term}" for client ${clientId}.`);
+    }
+
+    const principal = Number.parseFloat(loanAmount);
+    const monthlyRate = Number.parseFloat(interestRate) / 100;
 
     let durationUnit = 'months';
-    let numMonths = numUnits;
+    let totalMonths = installmentCount;
 
-    if (repaymentType === 'Monthly EMI') {
-        durationUnit = 'months';
-        numMonths = numUnits;
-    } else if (repaymentType === 'Weekly') {
+    if (repaymentType === 'Weekly') {
         durationUnit = 'weeks';
-        numMonths = numUnits / 4;
+        totalMonths = installmentCount / 4;
     } else if (repaymentType === 'Daily') {
         durationUnit = 'days';
-        numMonths = numUnits / 30;
+        totalMonths = installmentCount / 30;
     }
 
     let totalInterest = 0;
 
     if (interestType === 'flat') {
-        // Flat Interest: Interest = Principal * (Rate per month) * (Total Months)
-        totalInterest = P * monthlyRate * numMonths;
+        totalInterest = principal * monthlyRate * totalMonths;
     } else {
-        // Reducing Balance (EMI formula) to get Total Interest
-        // But we then SPREAD it equally as per user requirement "should be fixed for every month"
-        const periodRate = monthlyRate * (numMonths / numUnits);
+        const periodRate = monthlyRate * (totalMonths / installmentCount);
         if (periodRate > 0) {
-            const installmentAmount = (P * periodRate * Math.pow(1 + periodRate, numUnits)) / (Math.pow(1 + periodRate, numUnits) - 1);
-            totalInterest = (installmentAmount * numUnits) - P;
-        } else {
-            totalInterest = 0;
+            const installmentAmount =
+                (principal * periodRate * Math.pow(1 + periodRate, installmentCount)) /
+                (Math.pow(1 + periodRate, installmentCount) - 1);
+            totalInterest = installmentAmount * installmentCount - principal;
         }
     }
 
-    const installmentAmount = (P + totalInterest) / numUnits;
-    const interestPerInstallment = totalInterest / numUnits;
-    const principalPerInstallment = P / numUnits;
+    const interestPerInstallment = totalInterest / installmentCount;
+    const principalPerInstallment = principal / installmentCount;
+    const installmentAmount = principalPerInstallment + interestPerInstallment;
 
-    for (let i = 1; i <= numUnits; i++) {
-        const dueDate = moment(startDate).add(i, durationUnit).toDate();
+    const installments = [];
+
+    for (let index = 1; index <= installmentCount; index += 1) {
+        const dueDate = moment(startDate).add(index, durationUnit).toDate();
+
         installments.push({
-            client: client._id,
+            client: clientId,
             date: dueDate,
-            amount: installmentAmount.toFixed(2),
-            principal: principalPerInstallment.toFixed(2),
-            interest: interestPerInstallment.toFixed(2),
-            status: 'not-paid',
-            createdBy: client.createdBy,
+            amount: roundCurrency(installmentAmount),
+            principal: roundCurrency(principalPerInstallment),
+            interest: roundCurrency(interestPerInstallment),
+            amountPaid: 0,
+            remainingBalance: roundCurrency(installmentAmount),
+            status: 'not-started',
+            createdBy,
         });
     }
 
-    await Repayment.insertMany(installments);
+    return Repayment.insertMany(installments);
 };
 
 module.exports = generateInstallments;

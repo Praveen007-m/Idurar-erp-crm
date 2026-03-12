@@ -1,92 +1,239 @@
 const mongoose = require('mongoose');
 const createCRUDController = require('@/controllers/middlewaresControllers/createCRUDController');
 const { buildStaffFilter } = require('@/helpers/staffFilter');
-const { calculatePaymentStatus } = require('@/models/appModels/Repayment');
+const { calculateStatus, computeBalance } = require('@/models/appModels/Repayment');
+const getRepaymentDisplayStatus = require('@/utils/getRepaymentDisplayStatus');
+const Payment = require('@/models/appModels/Payment');
+const Setting = require('@/models/coreModels/Setting');
 
 function modelController() {
   const Model = mongoose.model('Repayment');
   const methods = createCRUDController('Repayment');
 
-  // Helper function to calculate and set payment status
-  const updatePaymentStatus = (repaymentData) => {
-    const paidAmount = repaymentData.amount || 0;
-    const installmentAmount = repaymentData.amount || 0;
-    const dueDate = repaymentData.date;
-    const paidDate = repaymentData.paidDate || null;
-
-    // Calculate paymentStatus based on payment details
-    const paymentStatus = calculatePaymentStatus(
-      paidAmount,
-      installmentAmount,
-      dueDate,
-      paidDate
-    );
-
-    // Also update legacy status field for backward compatibility
-    let status;
-    if (paymentStatus === 'paid' || paymentStatus === 'late') {
-      status = paymentStatus === 'late' ? 'late payment' : 'paid';
-    } else if (paymentStatus === 'partial') {
-      status = 'partial';
-    } else if (paymentStatus === 'default') {
-      status = 'not-paid';
-    } else {
-      status = 'not-paid';
-    }
-
-    return { ...repaymentData, paymentStatus, status };
+  const normalizeNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  // Override list method with staff filtering
+  const normalizeStatus = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+
+    if (normalizedStatus === 'late payment') return 'late';
+    if (normalizedStatus === 'not-paid' || normalizedStatus === 'not paid') return 'default';
+    if (normalizedStatus === 'not-started' || normalizedStatus === 'not started') return 'not_started';
+
+    return normalizedStatus;
+  };
+
+  const updatePaymentStatus = (repaymentData) => {
+    const nextRepaymentData = { ...repaymentData };
+    const amount = normalizeNumber(nextRepaymentData.amount);
+    let amountPaid = normalizeNumber(nextRepaymentData.amountPaid);
+
+    if (nextRepaymentData.paymentDate && !nextRepaymentData.paidDate) {
+      nextRepaymentData.paidDate = nextRepaymentData.paymentDate;
+    }
+
+    nextRepaymentData.status = calculateStatus({
+      ...nextRepaymentData,
+      amount,
+      amountPaid,
+    });
+
+    nextRepaymentData.amountPaid = amountPaid;
+    nextRepaymentData.balance = computeBalance({
+      ...nextRepaymentData,
+      amount,
+      amountPaid,
+    });
+    nextRepaymentData.remainingBalance = nextRepaymentData.balance;
+
+    delete nextRepaymentData.paymentStatus;
+    delete nextRepaymentData.paymentDate;
+
+    return nextRepaymentData;
+  };
+
+  const getNextPaymentNumber = async () => {
+    const query = {
+      settingCategory: 'finance_settings',
+      settingKey: 'last_payment_number',
+    };
+
+    const existingSetting = await Setting.findOne(query).select('_id settingValue').lean().exec();
+
+    if (!existingSetting) {
+      const createdSetting = await Setting.create({
+        ...query,
+        valueType: 'number',
+        settingValue: 1,
+      });
+
+      return Number(createdSetting.settingValue) || 1;
+    }
+
+    const updatedSetting = await Setting.findByIdAndUpdate(
+      existingSetting._id,
+      {
+        $inc: { settingValue: 1 },
+      },
+      {
+        new: true,
+      }
+    ).exec();
+
+    return Number(updatedSetting?.settingValue) || Number(existingSetting.settingValue) || 1;
+  };
+
+  const syncRepaymentPayment = async ({ repayment, previousRepayment = null, repaymentData, adminId }) => {
+    const totalAmountPaid = normalizeNumber(repaymentData.amountPaid ?? repayment.amountPaid);
+    const previousAmountPaid = normalizeNumber(previousRepayment?.amountPaid);
+    const receivedAmount = Math.max(totalAmountPaid - previousAmountPaid, previousRepayment ? 0 : totalAmountPaid);
+
+    if (receivedAmount <= 0) {
+      console.log('[repaymentController.syncRepaymentPayment] skipped: no received amount', {
+        repaymentId: repayment?._id?.toString?.() || repayment?._id,
+        totalAmountPaid,
+        previousAmountPaid,
+      });
+      return null;
+    }
+
+    const paymentDateValue =
+      repaymentData.paymentDate || repayment.paidDate || repayment.paymentDate || new Date();
+    const paymentDate = new Date(paymentDateValue);
+    const startOfDay = new Date(paymentDate);
+    const endOfDay = new Date(paymentDate);
+
+    startOfDay.setHours(0, 0, 0, 0);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingPayment = await Payment.findOne({
+      reference: repayment._id,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      removed: false,
+    }).exec();
+
+    const paymentPayload = {
+      client: repayment.client?._id || repayment.client,
+      date: paymentDate,
+      paymentMode: repaymentData.paymentMode || existingPayment?.paymentMode || 'Cash',
+      reference: repayment._id,
+      currency: existingPayment?.currency || 'NA',
+      description: existingPayment?.description || 'Repayment payment',
+    };
+
+    if (existingPayment) {
+      console.log('[repaymentController.syncRepaymentPayment] updating existing payment', {
+        paymentId: existingPayment._id.toString(),
+        repaymentId: repayment._id.toString(),
+        receivedAmount,
+      });
+      return Payment.findByIdAndUpdate(
+        existingPayment._id,
+        {
+          $set: paymentPayload,
+          $inc: { amount: receivedAmount },
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).exec();
+    }
+
+    const number = await getNextPaymentNumber();
+    console.log('[repaymentController.syncRepaymentPayment] creating payment', {
+      repaymentId: repayment._id.toString(),
+      number,
+      receivedAmount,
+      paymentDate: paymentDate.toISOString(),
+    });
+
+    return Payment.create({
+      ...paymentPayload,
+      amount: receivedAmount,
+      number,
+      createdBy: adminId,
+    });
+  };
+
+  const serializeRepayment = (repayment) => {
+    if (!repayment) return repayment;
+
+    const plainRepayment = typeof repayment.toObject === 'function' ? repayment.toObject() : repayment;
+
+    return {
+      ...plainRepayment,
+      displayStatus: getRepaymentDisplayStatus(plainRepayment),
+    };
+  };
+
+  const serializeRepayments = (repayments = []) => repayments.map((repayment) => serializeRepayment(repayment));
+
   methods.list = async (req, res) => {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.items) || 10;
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.items, 10) || 10;
       const skip = page * limit - limit;
 
       const { sortBy = 'date', sortValue = -1, filter, equal } = req.query;
-
-      // Build staff filter
       const staffFilter = await buildStaffFilter(req.admin, 'client');
-
       const fieldsArray = req.query.fields ? req.query.fields.split(',') : [];
 
-      let fields;
-      fields = fieldsArray.length === 0 ? {} : { $or: [] };
+      let fields = fieldsArray.length === 0 ? {} : { $or: [] };
 
       for (const field of fieldsArray) {
         fields.$or.push({ [field]: { $regex: new RegExp(req.query.q, 'i') } });
       }
 
-      // Query the database for a list of all results
-      const resultsPromise = Model.find({
+      let filterQuery = {
         removed: false,
-        ...staffFilter,
-        [filter]: equal,
         ...fields,
-      })
+      };
+
+      if (filter && equal) {
+        if (filter === 'client' || filter === 'clientId') {
+          const clientFilter = { [filter]: equal };
+
+          if (Object.keys(staffFilter).length > 0) {
+            filterQuery = {
+              ...filterQuery,
+              $and: [staffFilter, clientFilter],
+            };
+          } else {
+            filterQuery = {
+              ...filterQuery,
+              ...clientFilter,
+            };
+          }
+        } else {
+          filterQuery[filter] = equal;
+        }
+      } else {
+        filterQuery = {
+          ...filterQuery,
+          ...staffFilter,
+        };
+      }
+
+      const resultsPromise = Model.find(filterQuery)
         .skip(skip)
         .limit(limit)
         .sort({ [sortBy]: sortValue })
         .populate()
         .exec();
 
-      // Counting the total documents
-      const countPromise = Model.countDocuments({
-        removed: false,
-        ...staffFilter,
-        [filter]: equal,
-        ...fields,
-      });
+      const countPromise = Model.countDocuments(filterQuery);
+      const [repayments, count] = await Promise.all([resultsPromise, countPromise]);
+      const result = serializeRepayments(repayments);
 
-      // Resolving both promises
-      const [result, count] = await Promise.all([resultsPromise, countPromise]);
-
-      // Calculating total pages
       const pages = Math.ceil(count / limit);
-
-      // Getting Pagination Object
       const pagination = { page, pages, count };
+
       if (count > 0) {
         return res.status(200).json({
           success: true,
@@ -94,38 +241,33 @@ function modelController() {
           pagination,
           message: 'Successfully found all documents',
         });
-      } else {
-        return res.status(203).json({
-          success: true,
-          result: [],
-          pagination,
-          message: 'Collection is Empty',
-        });
       }
+
+      return res.status(203).json({
+        success: true,
+        result: [],
+        pagination,
+        message: 'Collection is Empty',
+      });
     } catch (error) {
       return res.status(500).json({
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
       });
     }
   };
 
-  // Override create method to ensure staff can only create repayments for their clients
   methods.create = async (req, res) => {
     try {
-      // Build staff filter to validate client access
-      const staffFilter = await buildStaffFilter(req.admin, 'client');
-      
-      // If staff, verify the client is assigned to them
       if (req.admin.role === 'staff' && req.body.client) {
         const clientIds = await mongoose.model('Client').find({
           assigned: req.admin._id,
-          removed: false
+          removed: false,
         }).select('_id');
-        
-        const clientIdStrings = clientIds.map(id => id.toString());
+
+        const clientIdStrings = clientIds.map((clientId) => clientId.toString());
         if (!clientIdStrings.includes(req.body.client.toString())) {
           return res.status(403).json({
             success: false,
@@ -135,24 +277,22 @@ function modelController() {
         }
       }
 
-      // Check for duplicate repayment - prevent creating multiple repayments for same client and date
       if (req.body.client && req.body.date) {
         const repaymentDate = new Date(req.body.date);
-        // Normalize to start of day for comparison
         repaymentDate.setHours(0, 0, 0, 0);
-        
+
         const nextDay = new Date(repaymentDate);
         nextDay.setDate(nextDay.getDate() + 1);
-        
+
         const existingRepayment = await Model.findOne({
           client: req.body.client,
           date: {
             $gte: repaymentDate,
-            $lt: nextDay
+            $lt: nextDay,
           },
-          removed: false
+          removed: false,
         });
-        
+
         if (existingRepayment) {
           return res.status(400).json({
             success: false,
@@ -162,13 +302,20 @@ function modelController() {
         }
       }
 
-      // Calculate payment status before creating
-      const repaymentDataWithStatus = updatePaymentStatus(req.body);
+      const createPayload = { ...req.body };
+      delete createPayload.status;
+      delete createPayload.balance;
+      const createData = updatePaymentStatus(createPayload);
+      const result = await Model.create(createData);
+      await syncRepaymentPayment({
+        repayment: result,
+        repaymentData: createData,
+        adminId: req.admin._id,
+      });
 
-      const result = await Model.create(repaymentDataWithStatus);
       return res.status(200).json({
         success: true,
-        result,
+        result: serializeRepayment(result),
         message: 'Successfully created Repayment',
       });
     } catch (error) {
@@ -176,153 +323,87 @@ function modelController() {
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
       });
     }
   };
 
-  // Override update method with staff filtering
   methods.update = async (req, res) => {
     try {
-      // Build staff filter
+      const { id } = req.params;
+      const repaymentData = { ...req.body };
       const staffFilter = await buildStaffFilter(req.admin, 'client');
 
-      // Find the existing repayment first
       const existingRepayment = await Model.findOne({
-        _id: req.params.id,
+        _id: id,
         removed: false,
         ...staffFilter,
-      }).populate('client').exec();
+      }).lean();
 
       if (!existingRepayment) {
         return res.status(404).json({
           success: false,
           result: null,
-          message: 'No document found',
+          message: 'Repayment not found',
         });
       }
 
-      // Check if this is a status-only update (user manually changing status)
-      // Allow for both status AND paymentStatus to be sent together
-      const hasStatusField = req.body.status !== undefined;
-      const hasPaymentStatusField = req.body.paymentStatus !== undefined;
-      const onlyStatusFields = (hasStatusField || hasPaymentStatusField) && 
-                              Object.keys(req.body).every(key => key === 'status' || key === 'paymentStatus');
-
-      // If only updating status, don't recalculate - just save the manual status
-      if (onlyStatusFields) {
-        const manualStatus = req.body.status || req.body.paymentStatus;
-        
-        const result = await Model.findOneAndUpdate(
-          {
-            _id: req.params.id,
-            removed: false,
-            ...staffFilter,
-          },
-          { 
-            status: manualStatus,
-            paymentStatus: manualStatus,
-            updated: new Date() 
-          },
-          {
-            new: true,
-            runValidators: true,
-          }
-        ).populate().exec();
-
-        if (!result) {
-          return res.status(404).json({
-            success: false,
-            result: null,
-            message: 'No document found',
-          });
-        }
-
-        return res.status(200).json({
-          success: true,
-          result,
-          message: 'Successfully updated Repayment',
+      if (normalizeStatus(existingRepayment.status) === 'paid') {
+        return res.status(400).json({
+          success: false,
+          result: null,
+          message: 'Paid repayments cannot be modified',
         });
       }
 
-      // If updating date or client, find and update all duplicates
-      const { date, client } = req.body;
-      
-      if (date || client) {
-        const newDate = date ? new Date(date) : existingRepayment.date;
-        const newClient = client || existingRepayment.client._id;
+      delete repaymentData.status;
+      delete repaymentData.balance;
 
-        // Find all repayments with the same date and client
-        const duplicates = await Model.find({
-          _id: { $ne: req.params.id },
-          client: newClient,
-          date: {
-            $gte: new Date(newDate.setHours(0, 0, 0, 0)),
-            $lt: new Date(new Date(newDate).setHours(23, 59, 59, 999))
-          },
-          removed: false,
-        });
-
-        // Update all duplicates with the new values
-        const updateData = { ...req.body, updated: new Date() };
-        if (duplicates.length > 0) {
-          const duplicateIds = duplicates.map(d => d._id);
-          await Model.updateMany(
-            { _id: { $in: duplicateIds } },
-            updateData
-          );
-        }
-      }
-
-      // Calculate payment status before updating (for non-status-only updates)
-      const repaymentDataWithStatus = updatePaymentStatus({
-        ...existingRepayment.toObject(),
-        ...req.body
+      const updateData = updatePaymentStatus({
+        ...existingRepayment,
+        ...repaymentData,
       });
 
-      const result = await Model.findOneAndUpdate(
-        {
-          _id: req.params.id,
-          removed: false,
-          ...staffFilter,
-        }, 
-        { 
-          ...repaymentDataWithStatus,
-          updated: new Date() 
-        },
-        {
-          new: true,
-          runValidators: true,
-        }
-      ).populate().exec();
+      delete updateData._id;
+      delete updateData.__v;
 
-      if (!result) {
+      const updatedRepayment = await Model.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true,
+      }).populate();
+
+      if (!updatedRepayment) {
         return res.status(404).json({
           success: false,
           result: null,
-          message: 'No document found',
+          message: 'Repayment not found',
         });
       }
 
+      await syncRepaymentPayment({
+        repayment: updatedRepayment,
+        previousRepayment: existingRepayment,
+        repaymentData: updateData,
+        adminId: req.admin._id,
+      });
+
       return res.status(200).json({
         success: true,
-        result,
-        message: 'Successfully updated Repayment',
+        result: serializeRepayment(updatedRepayment),
+        message: 'Repayment updated successfully',
       });
     } catch (error) {
       return res.status(500).json({
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
       });
     }
   };
 
-  // Override delete method with staff filtering
   methods.delete = async (req, res) => {
     try {
-      // Build staff filter
       const staffFilter = await buildStaffFilter(req.admin, 'client');
 
       const result = await Model.findOneAndUpdate(
@@ -345,7 +426,7 @@ function modelController() {
 
       return res.status(200).json({
         success: true,
-        result,
+        result: serializeRepayment(result),
         message: 'Successfully deleted Repayment',
       });
     } catch (error) {
@@ -353,15 +434,13 @@ function modelController() {
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
       });
     }
   };
 
-  // Override read method with staff filtering
   methods.read = async (req, res) => {
     try {
-      // Build staff filter
       const staffFilter = await buildStaffFilter(req.admin, 'client');
 
       const result = await Model.findOne({
@@ -380,7 +459,7 @@ function modelController() {
 
       return res.status(200).json({
         success: true,
-        result,
+        result: serializeRepayment(result),
         message: 'Successfully found document',
       });
     } catch (error) {
@@ -388,7 +467,112 @@ function modelController() {
         success: false,
         result: null,
         message: error.message,
-        error: error,
+        error,
+      });
+    }
+  };
+
+  methods.clientRepayments = async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
+      const query = {
+        removed: false,
+      };
+
+      if (staffFilter.client && staffFilter.client.$in) {
+        const clientObjectId = require('mongoose').Types.ObjectId.isValid(clientId)
+          ? clientId
+          : null;
+
+        if (clientObjectId && staffFilter.client.$in.includes(clientObjectId)) {
+          query.client = clientId;
+        } else {
+          return res.status(200).json({
+            success: true,
+            result: [],
+            message: 'No repayments found for this client',
+          });
+        }
+      } else {
+        query.client = clientId;
+      }
+
+      const repayments = await Model.find(query)
+        .sort({ date: 1 })
+        .populate('client')
+        .exec();
+
+      return res.status(200).json({
+        success: true,
+        result: serializeRepayments(repayments),
+        message: 'Successfully found repayments',
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        result: null,
+        message: error.message,
+        error,
+      });
+    }
+  };
+
+  methods.getByClientAndDate = async (req, res) => {
+    try {
+      const { clientId, date } = req.query;
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
+
+      if (!clientId || !date) {
+        return res.status(400).json({
+          success: false,
+          result: null,
+          message: 'clientId and date are required',
+        });
+      }
+
+      const start = new Date(date);
+      const end = new Date(date);
+
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      let query = {
+        client: clientId,
+        date: { $gte: start, $lte: end },
+        removed: false,
+      };
+
+      if (Object.keys(staffFilter).length > 0) {
+        query = {
+          $and: [query, staffFilter],
+        };
+      }
+
+      const repayment = await Model.findOne(query)
+        .sort({ date: 1, created: 1 })
+        .populate()
+        .exec();
+
+      if (!repayment) {
+        return res.status(404).json({
+          success: false,
+          result: null,
+          message: 'Repayment not found',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        result: serializeRepayment(repayment),
+        message: 'Successfully found repayment',
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        result: null,
+        message: error.message,
+        error,
       });
     }
   };
@@ -397,4 +581,3 @@ function modelController() {
 }
 
 module.exports = modelController();
-

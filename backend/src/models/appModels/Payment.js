@@ -20,7 +20,6 @@ const paymentSchema = new mongoose.Schema({
   invoice: {
     type: mongoose.Schema.ObjectId,
     ref: 'Invoice',
-    required: true,
     autopopulate: true,
   },
   date: {
@@ -39,8 +38,13 @@ const paymentSchema = new mongoose.Schema({
     required: true,
   },
   paymentMode: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'PaymentMode',
+    type: mongoose.Schema.Types.Mixed,
+    default: 'Cash',
+  },
+  reference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Repayment',
+    index: true,
     autopopulate: true,
   },
   ref: {

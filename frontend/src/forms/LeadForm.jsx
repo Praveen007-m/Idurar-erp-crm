@@ -1,4 +1,10 @@
 import { Form, Input, Select } from 'antd';
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from '@/utils/helpers';
 
 import useLanguage from '@/locale/useLanguage';
 
@@ -49,9 +55,21 @@ export default function LeadForm() {
           {
             required: true,
           },
+          {
+            pattern: validatePhoneNumber,
+            message: 'Enter valid 10-digit mobile number starting with 9,8,7,6',
+          },
         ]}
       >
-        <Input type="tel" />
+        <Input
+          type="tel"
+          maxLength={10}
+          inputMode="numeric"
+          placeholder="Enter mobile number"
+          onInput={handlePhoneInput}
+          onKeyPress={handlePhoneKeyPress}
+          onPaste={handlePhonePaste}
+        />
       </Form.Item>
 
       <Form.Item

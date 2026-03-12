@@ -1,6 +1,11 @@
 import { Form, Input, Select } from 'antd';
 import { DatePicker } from 'antd';
-import { validatePhoneNumber } from '@/utils/helpers';
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from '@/utils/helpers';
 import { useDate } from '@/settings';
 
 import useLanguage from '@/locale/useLanguage';
@@ -91,11 +96,19 @@ export default function EmployeeForm() {
             required: true,
           },
           {
-            pattern: validatePhoneNumber, // importing regex from helper.js utility file to validate
+            pattern: validatePhoneNumber,
+            message: 'Enter valid 10-digit mobile number starting with 9,8,7,6',
           },
         ]}
       >
-        <Input />
+        <Input
+          maxLength={10}
+          inputMode="numeric"
+          placeholder="Enter mobile number"
+          onInput={handlePhoneInput}
+          onKeyPress={handlePhoneKeyPress}
+          onPaste={handlePhonePaste}
+        />
       </Form.Item>
       <Form.Item
         name="department"

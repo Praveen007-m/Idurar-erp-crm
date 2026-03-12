@@ -6,7 +6,12 @@ const methods = createCRUDController('PaymentMode');
 delete methods['delete'];
 
 methods.create = async (req, res) => {
-  const { isDefault } = req.body;
+  const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : true;
+  let isDefault = req.body.isDefault === true;
+
+  if (!enabled) {
+    isDefault = false;
+  }
 
   if (isDefault) {
     await Model.updateMany({}, { isDefault: false });
@@ -18,8 +23,8 @@ methods.create = async (req, res) => {
 
   const result = await new Model({
     ...req.body,
-
-    isDefault: countDefault < 1 ? true : false,
+    enabled,
+    isDefault: enabled ? isDefault || countDefault < 1 : false,
   }).save();
 
   return res.status(200).json({
@@ -43,20 +48,37 @@ methods.update = async (req, res) => {
     _id: req.params.id,
     removed: false,
   }).exec();
-  const { isDefault = paymentMode.isDefault, enabled = paymentMode.enabled } = req.body;
+
+  if (!paymentMode) {
+    return res.status(404).json({
+      success: false,
+      result: null,
+      message: 'Payment mode not found',
+    });
+  }
+
+  const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : paymentMode.enabled;
+  let isDefault = req.body.isDefault !== undefined ? Boolean(req.body.isDefault) : paymentMode.isDefault;
+
+  if (!enabled) {
+    isDefault = false;
+  }
 
   // if isDefault:false , we update first - isDefault:true
   // if enabled:false and isDefault:true , we update first - isDefault:true
   if (!isDefault || (!enabled && isDefault)) {
-    await Model.findOneAndUpdate({ _id: { $ne: id }, enabled: true }, { isDefault: true });
+    await Model.findOneAndUpdate(
+      { _id: { $ne: id }, enabled: true, removed: false },
+      { isDefault: true }
+    );
   }
 
   // if isDefault:true and enabled:true, we update other paymentMode and make is isDefault:false
-  if (isDefault && enabled) {
+  if (isDefault) {
     await Model.updateMany({ _id: { $ne: id } }, { isDefault: false });
   }
 
-  const paymentModeCount = await Model.countDocuments({});
+  const paymentModeCount = await Model.countDocuments({ removed: false });
 
   // if enabled:false and it's only one exist, we can't disable
   if ((!enabled || !isDefault) && paymentModeCount <= 1) {
@@ -67,9 +89,35 @@ methods.update = async (req, res) => {
     });
   }
 
-  const result = await Model.findOneAndUpdate({ _id: id }, req.body, {
-    new: true,
+  let result = await Model.findOneAndUpdate(
+    { _id: id },
+    {
+      ...req.body,
+      enabled,
+      isDefault,
+    },
+    {
+      new: true,
+    }
+  );
+
+  const defaultPaymentModeCount = await Model.countDocuments({
+    removed: false,
+    enabled: true,
+    isDefault: true,
   });
+
+  if (defaultPaymentModeCount < 1) {
+    const fallbackDefault = await Model.findOneAndUpdate(
+      { _id: { $ne: id }, removed: false, enabled: true },
+      { isDefault: true },
+      { new: true }
+    );
+
+    if (!fallbackDefault && enabled) {
+      result = await Model.findOneAndUpdate({ _id: id }, { isDefault: true }, { new: true });
+    }
+  }
 
   return res.status(200).json({
     success: true,

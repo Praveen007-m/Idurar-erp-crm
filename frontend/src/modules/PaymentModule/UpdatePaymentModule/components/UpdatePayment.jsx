@@ -13,7 +13,7 @@ import calculate from '@/utils/calculate';
 import PaymentForm from '@/forms/PaymentForm';
 import { useNavigate } from 'react-router-dom';
 
-export default function UpdatePayment({ config, currentInvoice }) {
+export default function UpdatePayment({ config, currentPayment }) {
   const translate = useLanguage();
   const navigate = useNavigate();
   let { entity } = config;
@@ -26,44 +26,60 @@ export default function UpdatePayment({ config, currentInvoice }) {
   const [maxAmount, setMaxAmount] = useState(0);
 
   useEffect(() => {
-    if (currentInvoice) {
-      const { credit, total, discount, amount } = currentInvoice;
+    if (currentPayment) {
+      const paymentReference = currentPayment.reference || currentPayment.details;
+      const isRepaymentPayment = Boolean(currentPayment.isRepaymentPayment && paymentReference);
 
-      setMaxAmount(
-        calculate.sub(calculate.sub(total, discount), calculate.sub(calculate.sub(credit, amount)))
-      );
-      const newInvoiceValues = { ...currentInvoice };
+      if (isRepaymentPayment) {
+        const installmentAmount = Number(paymentReference.amount || 0);
+        const alreadyPaid = Number(paymentReference.amountPaid || currentPayment.amount || 0);
+        const remainingBalance = Number(
+          paymentReference.remainingBalance ?? Math.max(installmentAmount - alreadyPaid, 0)
+        );
+        setMaxAmount(remainingBalance > 0 ? remainingBalance : installmentAmount);
+      } else {
+        const { credit, total, discount, amount } = currentPayment.details || currentPayment;
+        setMaxAmount(
+          calculate.sub(calculate.sub(total, discount), calculate.sub(calculate.sub(credit, amount)))
+        );
+      }
+
+      const newInvoiceValues = { ...currentPayment };
       if (newInvoiceValues.date) {
         newInvoiceValues.date = dayjs(newInvoiceValues.date);
       }
       form.setFieldsValue(newInvoiceValues);
     }
-  }, [currentInvoice]);
+  }, [currentPayment, form]);
 
   useEffect(() => {
     if (isSuccess) {
       form.resetFields();
       dispatch(erp.resetAction({ actionType: 'recordPayment' }));
       dispatch(erp.list({ entity }));
-      navigate(`/${entity.toLowerCase()}/read/${currentInvoice._id}`);
+      navigate(`/${entity.toLowerCase()}/read/${currentPayment._id}`);
     }
-  }, [isSuccess]);
+  }, [isSuccess, form, dispatch, entity, navigate, currentPayment]);
 
   const onSubmit = (fieldsValue) => {
-    if (currentInvoice) {
-      const { _id: invoice } = currentInvoice;
-      const client = currentInvoice.client && currentInvoice.client._id;
+    if (currentPayment) {
+      const client = currentPayment.client && currentPayment.client._id;
       fieldsValue = {
         ...fieldsValue,
-        invoice,
         client,
       };
+
+      if (currentPayment.isRepaymentPayment && currentPayment.reference) {
+        fieldsValue.reference = currentPayment.reference._id || currentPayment.reference;
+      } else if (currentPayment.invoice) {
+        fieldsValue.invoice = currentPayment.invoice._id || currentPayment.invoice;
+      }
     }
 
     dispatch(
       erp.update({
         entity,
-        id: currentInvoice._id,
+        id: currentPayment._id,
         jsonData: fieldsValue,
       })
     );

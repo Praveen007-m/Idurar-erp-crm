@@ -38,27 +38,24 @@ function modelController() {
         });
       }
 
+      const { generate: uniqueId } = require('shortid');
+      const salt = uniqueId();
+      const hashedPassword = bcrypt.hashSync(salt + password);
+
       // Create Admin document first
       const staff = new Model({
         name,
         email,
         phone,
+        password: hashedPassword,
         role: role || "staff",
         enabled: true,
         removed: false
       });
 
       const savedStaff = await staff.save();
-      console.log("Admin document created:", savedStaff._id);
 
       try {
-        // Generate salt (plain random string) and hash password
-        // CORRECT METHOD: Use uniqueId for salt (like setup.js), NOT bcrypt.genSaltSync
-        // And use bcrypt.hashSync WITHOUT rounds parameter (uses default 10)
-        const { generate: uniqueId } = require('shortid');
-        const salt = uniqueId();
-        const hashedPassword = bcrypt.hashSync(salt + password);
-
         // Create Password document
         const passwordDoc = new Password({
           user: savedStaff._id,
@@ -69,7 +66,6 @@ function modelController() {
         });
 
         const savedPassword = await passwordDoc.save();
-        console.log("Password document created:", savedPassword._id);
 
         // Verify the password document was created
         const verifyPassword = await Password.findOne({ user: savedStaff._id });
@@ -231,6 +227,8 @@ function modelController() {
           const { generate: uniqueId } = require('shortid');
           const salt = uniqueId();
           const hashedPassword = bcrypt.hashSync(salt + password);
+
+          updateData.password = hashedPassword;
 
           // Check if password document exists
           let passwordDoc = await Password.findOne({ user: id });

@@ -31,22 +31,42 @@ import dayjs from 'dayjs';
 
 import { ErpLayout } from '@/layout';
 import { crud } from '@/redux/crud/actions';
-import { selectListItems, selectReadItem } from '@/redux/crud/selectors';
+import { selectReadItem } from '@/redux/crud/selectors';
 import { useDispatch, useSelector } from 'react-redux';
 import useLanguage from '@/locale/useLanguage';
 import { useMoney, useDate } from '@/settings';
+import { request } from '@/request';
+import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 
 const BOX_BORDER = '#28a7ab';
 const BOX_BG = '#e9f7f8';
 const BOX_TEXT = '#117a8b';
 
-// Status colors for calendar events
-const statusColors = {
-  paid: '#52c41a',        // green - fully paid
-  late: '#faad14',        // yellow - late payment
-  partial: '#fa8c16',     // orange - partial payment
-  default: '#ff4d4f',     // red - overdue/unpaid
-  not_started: '#d9d9d9', // grey - future payment
+const normalizeRepaymentStatus = (status) => {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+
+  if (normalizedStatus === 'late payment') return 'late';
+  if (normalizedStatus === 'not-paid' || normalizedStatus === 'not paid') return 'default';
+  if (normalizedStatus === 'not_started' || normalizedStatus === 'not started') return 'not-started';
+
+  return normalizedStatus || 'not-started';
+};
+
+const getDisplayStatus = (repayment) => {
+  const today = new Date();
+  const due = new Date(repayment?.date);
+  const status = normalizeRepaymentStatus(repayment?.status);
+
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+
+  if (status === 'paid') return 'paid';
+  if (status === 'late') return 'late';
+  if (status === 'partial') return 'partial';
+
+  if (today < due) return 'not-started';
+
+  return 'default';
 };
 
 export default function CustomerCalendar() {
@@ -58,7 +78,10 @@ export default function CustomerCalendar() {
   const dispatch = useDispatch();
 
   const { result: client, isLoading: isClientLoading } = useSelector(selectReadItem);
-  const { result: repaymentsResult, isLoading: isRepaymentsLoading } = useSelector(selectListItems);
+  
+  // Use local state for repayments since we need a custom endpoint
+  const [repayments, setRepayments] = useState([]);
+  const [isRepaymentsLoading, setIsRepaymentsLoading] = useState(false);
 
   const [calendarMonth, setCalendarMonth] = useState(dayjs());
   const [modalOpen, setModalOpen] = useState(false);
@@ -82,43 +105,52 @@ export default function CustomerCalendar() {
     };
   }, [clientId]);
 
-  const fetchRepayments = () => {
-    dispatch(crud.list({ 
-      entity: 'repayment', 
-      options: { filter: 'client', equal: clientId, items: 200, page: 1 } 
-    }));
+  const fetchRepayments = async () => {
+    console.log('[CustomerCalendar] fetchRepayments called with clientId:', clientId);
+    setIsRepaymentsLoading(true);
+    
+    try {
+      // Use the dedicated client-specific endpoint for calendar
+      const response = await request.get({ entity: `/repayment/client/${clientId}` });
+      console.log('[CustomerCalendar] API response:', response);
+      
+      if (response.success) {
+        setRepayments(response.result || []);
+      } else {
+        console.error('[CustomerCalendar] API error:', response.message);
+        setRepayments([]);
+      }
+    } catch (error) {
+      console.error('[CustomerCalendar] Error fetching repayments:', error);
+      setRepayments([]);
+    } finally {
+      setIsRepaymentsLoading(false);
+    }
   };
 
   // Transform repayments to calendar events
   const calendarEvents = useMemo(() => {
-    const repayments = repaymentsResult?.items || [];
-    return repayments.map((repayment) => {
-      const status = repayment.paymentStatus || repayment.status;
+    // DEBUG: Log repayments data
+    console.log('[CustomerCalendar] repayments:', repayments);
+    console.log('[CustomerCalendar] clientId:', clientId);
+    
+    const events = repayments.map((repayment) => {
+      const status = getDisplayStatus(repayment);
       const eventDate = dayjs(repayment.date);
-      
-      // Determine color based on status
-      let color = statusColors.not_started;
-      if (status === 'paid') color = statusColors.paid;
-      else if (status === 'late') color = statusColors.late;
-      else if (status === 'partial') color = statusColors.partial;
-      else if (status === 'default') color = statusColors.default;
-      else if (status === 'not-paid') {
-        const today = dayjs().startOf('day');
-        if (eventDate.isBefore(today)) {
-          color = statusColors.default;
-        }
-      }
 
       return {
         id: repayment._id,
         title: `${moneyFormatter({ amount: repayment.amount })} - ${translate(status)}`,
         date: eventDate,
-        color,
+        color: repaymentStatusColor[status] || repaymentStatusColor['not-started'],
         repayment,
         status,
       };
     });
-  }, [repaymentsResult, moneyFormatter, translate]);
+    
+    console.log('[CustomerCalendar] calendarEvents:', events);
+    return events;
+  }, [repayments, moneyFormatter, translate]);
 
   // Group events by date for calendar display
   const eventsByDate = useMemo(() => {
@@ -135,17 +167,16 @@ export default function CustomerCalendar() {
 
   // Calculate totals
   const totals = useMemo(() => {
-    const repayments = repaymentsResult?.items || [];
     const paid = repayments
-      .filter((r) => r.status === 'paid' || r.paymentStatus === 'paid')
+      .filter((repayment) => ['paid', 'late'].includes(normalizeRepaymentStatus(repayment.status)))
       .reduce((sum, r) => sum + Number(r.amount || 0), 0);
     
     const pending = repayments
-      .filter((r) => r.status !== 'paid' && r.paymentStatus !== 'paid')
+      .filter((repayment) => !['paid', 'late'].includes(normalizeRepaymentStatus(repayment.status)))
       .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
     return { paid, pending, total: paid + pending };
-  }, [repaymentsResult]);
+  }, [repayments]);
 
   // Handle calendar cell click
   const handleDateClick = (date) => {
@@ -186,15 +217,9 @@ export default function CustomerCalendar() {
       title: translate('Status'),
       dataIndex: 'status',
       key: 'status',
-      render: (status, record) => {
-        const paymentStatus = record.paymentStatus || status;
-        let color = 'default';
-        if (paymentStatus === 'paid') color = 'green';
-        else if (paymentStatus === 'late') color = 'gold';
-        else if (paymentStatus === 'partial') color = 'orange';
-        else if (paymentStatus === 'default') color = 'red';
-        
-        return <Tag color={color}>{translate(paymentStatus)}</Tag>;
+      render: (_, record) => {
+        const status = getDisplayStatus(record);
+        return <Tag color={repaymentStatusColor[status] || repaymentStatusColor['not-started']}>{status.replace('-', ' ').toUpperCase()}</Tag>;
       },
     },
   ];
@@ -324,24 +349,24 @@ export default function CustomerCalendar() {
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, background: statusColors.paid, borderRadius: 3 }} />
+              <span style={{ width: 14, height: 14, background: repaymentStatusColor.paid, borderRadius: 3 }} />
               {translate('Paid')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, background: statusColors.late, borderRadius: 3 }} />
+              <span style={{ width: 14, height: 14, background: repaymentStatusColor.late, borderRadius: 3 }} />
               {translate('Late')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, background: statusColors.partial, borderRadius: 3 }} />
+              <span style={{ width: 14, height: 14, background: repaymentStatusColor.partial, borderRadius: 3 }} />
               {translate('Partial')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, background: statusColors.default, borderRadius: 3 }} />
+              <span style={{ width: 14, height: 14, background: repaymentStatusColor.default, borderRadius: 3 }} />
               {translate('Default')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, background: statusColors.not_started, borderRadius: 3 }} />
-              {translate('Not Started')}
+              <span style={{ width: 14, height: 14, background: repaymentStatusColor['not-started'], borderRadius: 3 }} />
+              Not Started
             </span>
           </div>
         </Card>
@@ -468,13 +493,13 @@ export default function CustomerCalendar() {
                 <Col span={24}>
                   <Typography.Text type="secondary">{translate('Status')}</Typography.Text>
                   <div style={{ marginTop: 4 }}>
-                    <Tag color={
-                      selectedRepayment.paymentStatus === 'paid' ? 'green' :
-                      selectedRepayment.paymentStatus === 'late' ? 'gold' :
-                      selectedRepayment.paymentStatus === 'partial' ? 'orange' :
-                      selectedRepayment.paymentStatus === 'default' ? 'red' : 'default'
-                    }>
-                      {translate(selectedRepayment.paymentStatus || selectedRepayment.status)}
+                    <Tag
+                      color={
+                        repaymentStatusColor[normalizeRepaymentStatus(selectedRepayment.status)] ||
+                        repaymentStatusColor['not-started']
+                      }
+                    >
+                      {getDisplayStatus(selectedRepayment).replace('-', ' ').toUpperCase()}
                     </Tag>
                   </div>
                 </Col>

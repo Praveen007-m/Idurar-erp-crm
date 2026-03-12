@@ -18,6 +18,7 @@ const defaultNotification = {
   warning: () => {},
   info: () => {},
   open: () => {},
+  config: () => {}, // Add config method to prevent errors
 };
 
 export const getNotification = () => {

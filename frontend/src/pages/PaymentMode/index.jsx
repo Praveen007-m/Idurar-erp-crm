@@ -102,6 +102,7 @@ export default function PaymentMode() {
 
   const configPage = {
     entity,
+    closePanelOnSuccess: true,
     ...Labels,
   };
   const config = {
@@ -113,8 +114,12 @@ export default function PaymentMode() {
   };
   return (
     <CrudModule
-      createForm={<PaymentModeForm />}
-      updateForm={<PaymentModeForm isUpdateForm={true} />}
+      createForm={({ onCancel, loading }) => (
+        <PaymentModeForm onCancel={onCancel} loading={loading} />
+      )}
+      updateForm={({ onCancel, loading }) => (
+        <PaymentModeForm isUpdateForm={true} onCancel={onCancel} loading={loading} />
+      )}
       config={config}
     />
   );

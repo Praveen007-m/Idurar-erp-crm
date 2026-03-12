@@ -1,6 +1,12 @@
 import { Form, Input, Select } from 'antd';
 import { UploadOutlined, CloseOutlined, CheckOutlined } from '@ant-design/icons';
 import { message, Upload, Button, Switch } from 'antd';
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from '@/utils/helpers';
 
 import useLanguage from '@/locale/useLanguage';
 
@@ -55,6 +61,30 @@ export default function AdminForm({ isUpdateForm = false }) {
         ]}
       >
         <Input autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        label={translate('phone')}
+        name="phone"
+        rules={[
+          {
+            required: true,
+            message: 'Phone number is required',
+          },
+          {
+            pattern: validatePhoneNumber,
+            message: 'Enter valid 10-digit mobile number starting with 9,8,7,6',
+          },
+        ]}
+      >
+        <Input
+          autoComplete="off"
+          maxLength={10}
+          inputMode="numeric"
+          placeholder="Enter mobile number"
+          onInput={handlePhoneInput}
+          onKeyPress={handlePhoneKeyPress}
+          onPaste={handlePhonePaste}
+        />
       </Form.Item>
 
       <Form.Item

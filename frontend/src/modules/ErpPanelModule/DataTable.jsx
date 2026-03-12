@@ -23,6 +23,8 @@ import { generate as uniqueId } from 'shortid';
 import { useNavigate } from 'react-router-dom';
 
 import { DOWNLOAD_BASE_URL } from '@/config/serverApiConfig';
+import { notification } from 'antd';
+import { downloadPaymentPdf } from '@/utils/downloadPaymentPdf';
 
 function AddNewItem({ config }) {
   const navigate = useNavigate();
@@ -86,8 +88,19 @@ export default function DataTable({ config, extra = [] }) {
     dispatch(erp.currentAction({ actionType: 'update', data }));
     navigate(`/${entity}/update/${record._id}`);
   };
-  const handleDownload = (record) => {
-    window.open(`${DOWNLOAD_BASE_URL}${entity}/${entity}-${record._id}.pdf`, '_blank');
+  const handleDownload = async (record) => {
+    try {
+      if (entity === 'payment') {
+        await downloadPaymentPdf(record._id);
+        return;
+      }
+
+      window.open(`${DOWNLOAD_BASE_URL}/${entity}/${entity}-${record._id}.pdf`, '_blank');
+    } catch (error) {
+      notification.error({
+        message: error.message || 'Failed to download file',
+      });
+    }
   };
 
   const handleDelete = (record) => {

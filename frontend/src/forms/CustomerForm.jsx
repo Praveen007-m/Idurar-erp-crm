@@ -1,6 +1,11 @@
 import { Form, Input, DatePicker, InputNumber, Select, Button, Row, Col } from 'antd';
 import dayjs from 'dayjs';
-import { validatePhoneNumber } from '@/utils/helpers';
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from '@/utils/helpers';
 
 import useLanguage from '@/locale/useLanguage';
 import useRole from '@/hooks/useRole';
@@ -109,11 +114,18 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
               { validator: validateEmptyString },
               {
                 pattern: validatePhoneNumber,
-                message: 'Please enter a valid phone number',
+                message: 'Enter valid 10-digit mobile number starting with 9,8,7,6',
               },
             ]}
           >
-            <Input />
+            <Input
+              maxLength={10}
+              inputMode="numeric"
+              placeholder="Enter mobile number"
+              onInput={handlePhoneInput}
+              onKeyPress={handlePhoneKeyPress}
+              onPaste={handlePhonePaste}
+            />
           </Form.Item>
         </Col>
 

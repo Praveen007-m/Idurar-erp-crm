@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Form, Input, Select, Modal, message, Space } from "antd";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Table, Button, Form, Input, Select, Modal, message, Space, Grid, Typography } from "antd";
+import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useDispatch, useSelector } from "react-redux";
 import { crud } from "@/redux/crud/actions";
 import { selectListItems } from "@/redux/crud/selectors";
 import { ErpLayout } from "@/layout";
 import { request } from "@/request";
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from "@/utils/helpers";
 
 export default function Staff() {
+  const { useBreakpoint } = Grid;
+  const screens = useBreakpoint();
 
   const dispatch = useDispatch();
 
@@ -21,6 +29,8 @@ export default function Staff() {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [currentStaff, setCurrentStaff] = useState(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
 
@@ -102,13 +112,18 @@ export default function Staff() {
 
   // Handle Edit form submit
   const handleEditStaff = async (values) => {
+    setEditLoading(true);
 
     try {
-
-      await request.patch({
+      const response = await request.patch({
         entity: "admin/updateStaff/" + currentStaff._id,
         jsonData: values,
       });
+
+      if (!response?.success) {
+        message.error(response?.message || "Failed to update staff");
+        return;
+      }
 
       message.success("Staff updated successfully");
 
@@ -125,6 +140,9 @@ export default function Staff() {
         error?.response?.data?.message || "Failed to update staff"
       );
 
+    }
+    finally {
+      setEditLoading(false);
     }
 
   };
@@ -163,13 +181,26 @@ export default function Staff() {
   };
 
   const handleCreateStaff = async (values) => {
+    setCreateLoading(true);
+
+    const payload = {
+      name: values.name?.trim(),
+      email: values.email?.trim().toLowerCase(),
+      phone: values.phone,
+      role: values.role,
+      password: values.password,
+    };
 
     try {
-
-      await request.post({
+      const response = await request.post({
         entity: "admin/createStaff",
-        jsonData: values,
+        jsonData: payload,
       });
+
+      if (!response?.success) {
+        message.error(response?.message || "Failed to create staff");
+        return;
+      }
 
       message.success("Staff created successfully");
 
@@ -186,26 +217,59 @@ export default function Staff() {
       );
 
     }
+    finally {
+      setCreateLoading(false);
+    }
 
   };
 
   return (
     <ErpLayout>
-
-      <Button type="primary" onClick={() => setOpen(true)} style={{ marginBottom: 16 }}>
-        Create Staff
-      </Button>
-
-      <Table
-        columns={columns}
-        dataSource={items}
-        rowKey="_id"
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
-          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+      <div
+        style={{
+          margin: screens.xs && !screens.md ? "16px" : "24px 32px",
+          padding: screens.xs && !screens.md ? "16px" : "24px",
+          background: "#ffffff",
+          border: "1px solid #f0f0f0",
         }}
-      />
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 24,
+          }}
+        >
+          <Typography.Title level={2} style={{ margin: 0 }}>
+            Staff
+          </Typography.Title>
+
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setOpen(true)}
+            style={{
+              minWidth: screens.xs && !screens.sm ? "100%" : undefined,
+            }}
+          >
+            Create Staff
+          </Button>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={items}
+          rowKey="_id"
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          }}
+        />
+      </div>
 
       {/* Create Staff Modal */}
       <Modal
@@ -233,30 +297,31 @@ export default function Staff() {
           <Form.Item
             label="Mobile Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter mobile number" }]}
+            rules={[
+              { required: true, message: "Please enter mobile number" },
+              {
+                pattern: validatePhoneNumber,
+                message: "Enter valid 10-digit mobile number starting with 9,8,7,6",
+              },
+            ]}
           >
             <Input
               placeholder="Enter mobile number"
               maxLength={10}
               inputMode="numeric"
-              onInput={(e) => {
-
-                let value = e.target.value.replace(/\D/g, "");
-
-                if (value.length === 1 && !/[6-9]/.test(value)) {
-                  value = "";
-                }
-
-                e.target.value = value.slice(0, 10);
-
-              }}
+              onInput={handlePhoneInput}
+              onKeyPress={handlePhoneKeyPress}
+              onPaste={handlePhonePaste}
             />
           </Form.Item>
 
           <Form.Item
             label="Login Email"
             name="email"
-            rules={[{ required: true, message: "Please enter login email" }]}
+            rules={[
+              { required: true, message: "Please enter login email" },
+              { type: "email", message: "Enter a valid email address" },
+            ]}
           >
             <Input
               placeholder="Enter login email"
@@ -272,9 +337,31 @@ export default function Staff() {
           <Form.Item
             label="Login Password"
             name="password"
-            rules={[{ required: true, message: "Please enter password" }]}
+            rules={[
+              { required: true, message: "Password is required" },
+              { min: 6, message: "Minimum 6 characters" },
+            ]}
           >
             <Input.Password placeholder="Enter password" />
+          </Form.Item>
+
+          <Form.Item
+            label="Confirm Password"
+            name="confirmPassword"
+            dependencies={["password"]}
+            rules={[
+              { required: true, message: "Confirm password" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("password") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("Passwords do not match"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Confirm password" />
           </Form.Item>
 
           <Form.Item
@@ -288,7 +375,7 @@ export default function Staff() {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={createLoading}>
               Create Staff
             </Button>
           </Form.Item>
@@ -327,30 +414,31 @@ export default function Staff() {
           <Form.Item
             label="Mobile Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter mobile number" }]}
+            rules={[
+              { required: true, message: "Please enter mobile number" },
+              {
+                pattern: validatePhoneNumber,
+                message: "Enter valid 10-digit mobile number starting with 9,8,7,6",
+              },
+            ]}
           >
             <Input
               placeholder="Enter mobile number"
               maxLength={10}
               inputMode="numeric"
-              onInput={(e) => {
-
-                let value = e.target.value.replace(/\D/g, "");
-
-                if (value.length === 1 && !/[6-9]/.test(value)) {
-                  value = "";
-                }
-
-                e.target.value = value.slice(0, 10);
-
-              }}
+              onInput={handlePhoneInput}
+              onKeyPress={handlePhoneKeyPress}
+              onPaste={handlePhonePaste}
             />
           </Form.Item>
 
           <Form.Item
             label="Login Email"
             name="email"
-            rules={[{ required: true, message: "Please enter login email" }]}
+            rules={[
+              { required: true, message: "Please enter login email" },
+              { type: "email", message: "Enter a valid email address" },
+            ]}
           >
             <Input
               placeholder="Enter login email"
@@ -372,7 +460,7 @@ export default function Staff() {
 
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={editLoading}>
                 Update Staff
               </Button>
               <Button onClick={() => {

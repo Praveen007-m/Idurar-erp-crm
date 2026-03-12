@@ -1,5 +1,11 @@
 import { Form, Input, Button, Select, message } from "antd";
 import axios from "axios";
+import {
+  validatePhoneNumber,
+  handlePhoneInput,
+  handlePhoneKeyPress,
+  handlePhonePaste,
+} from "@/utils/helpers";
 
 export default function CreateStaff() {
 
@@ -30,9 +36,22 @@ export default function CreateStaff() {
         <Form.Item
             label="Mobile Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter mobile number" }]}
+            rules={[
+              { required: true, message: "Please enter mobile number" },
+              {
+                pattern: validatePhoneNumber,
+                message: "Enter valid 10-digit mobile number starting with 9,8,7,6",
+              },
+            ]}
         >
-            <Input placeholder="Enter mobile number" />
+            <Input
+              placeholder="Enter mobile number"
+              maxLength={10}
+              inputMode="numeric"
+              onInput={handlePhoneInput}
+              onKeyPress={handlePhoneKeyPress}
+              onPaste={handlePhonePaste}
+            />
         </Form.Item>
 
         <Form.Item

@@ -78,7 +78,32 @@ const routerApp = (entity, controller) => {
     router.route(`/${entity}/convert/:id`)
       .get(catchErrors(controller['convert']));
   }
+
+  // Repayment: Add dedicated client-specific endpoint for calendar
+  if (entity === 'repayment') {
+    router.route(`/${entity}/by-client-date`)
+      .get(catchErrors(controller['getByClientAndDate']));
+
+    router.route(`/${entity}/client/:clientId`)
+      .get(catchErrors(controller['clientRepayments']));
+  }
 };
+
+router
+  .route('/payment/download/:id')
+  .get(catchErrors(appControllers.paymentController.download));
+
+router
+  .route('/payments/:id/download')
+  .get(catchErrors(appControllers.paymentController.download));
+
+router
+  .route('/payment-mode')
+  .post(catchErrors(appControllers.paymentModeController.create));
+
+router
+  .route('/payment-mode/:id')
+  .put(catchErrors(appControllers.paymentModeController.update));
 
 
 // =============================

@@ -298,6 +298,17 @@ html
         .left.col-24
               .line
               h3 #{translate('total paid')} : #{moneyFormatter({amount:model.amount})}
+              table.table-invoice
+                tbody
+                  tr
+                    td.service #{translate('Payment Mode')}
+                    td.total #{typeof model.paymentMode === 'string' ? model.paymentMode : (model.paymentMode && model.paymentMode.name) || '-'}
+                  tr
+                    td.service #{translate('Reference')}
+                    td.total #{model.ref || (model.reference && model.reference._id) || '-'}
+                  tr
+                    td.service #{translate('Description')}
+                    td.total #{model.description || '-'}
                 
         
       .col.col-24
