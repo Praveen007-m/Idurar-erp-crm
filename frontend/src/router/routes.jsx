@@ -32,6 +32,12 @@ const About = lazy(() => import('@/pages/About'));
 const Repayment = lazy(() => import('@/pages/Repayment'));
 const ClientRepayment = lazy(() => import('@/pages/Repayment/ClientRepayment'));
 const CustomerCalendar = lazy(() => import('@/pages/Customer/CustomerCalendar'));
+const StaffDashboard = lazy(() => import('@/pages/StaffDashboard'));
+const Reports = lazy(() => import('@/pages/Reports'));
+const Performance = lazy(() => import('@/pages/Performance'));
+const PerformanceSummary = lazy(() => import('@/pages/PerformanceSummary'));
+
+
 
 let routes = {
   expense: [],
@@ -58,6 +64,42 @@ let routes = {
       ),
     },
     {
+      path: '/reports',
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Reports />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/performance',
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Performance />
+        </ProtectedRoute>
+      ),
+    },
+
+
+    {
+      path: '/staff-dashboard',
+      element: (
+        <ProtectedRoute allowedRoles={['staff']}>
+          <StaffDashboard />
+        </ProtectedRoute>
+      ),
+    },
+
+    {
+      path: '/performance-summary',
+      element: (
+        <ProtectedRoute allowedRoles={['staff']}>
+          <PerformanceSummary />
+        </ProtectedRoute>
+      ),
+    },
+
+    {
       path: '/customer',
       element: <Customer />,
     },
@@ -73,68 +115,131 @@ let routes = {
 
     {
       path: '/invoice',
-      element: <Invoice />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Invoice />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/invoice/create',
-      element: <InvoiceCreate />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <InvoiceCreate />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/invoice/read/:id',
-      element: <InvoiceRead />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <InvoiceRead />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/invoice/update/:id',
-      element: <InvoiceUpdate />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <InvoiceUpdate />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/invoice/pay/:id',
-      element: <InvoiceRecordPayment />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <InvoiceRecordPayment />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/quote',
-      element: <Quote />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Quote />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/quote/create',
-      element: <QuoteCreate />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <QuoteCreate />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/quote/read/:id',
-      element: <QuoteRead />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <QuoteRead />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/quote/update/:id',
-      element: <QuoteUpdate />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <QuoteUpdate />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/payment',
-      element: <Payment />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Payment />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/payment/read/:id',
-      element: <PaymentRead />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <PaymentRead />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/payment/update/:id',
-      element: <PaymentUpdate />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <PaymentUpdate />
+        </ProtectedRoute>
+      ),
     },
-
     {
       path: '/settings',
-      element: <Settings />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Settings />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/settings/edit/:settingsKey',
-      element: <Settings />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Settings />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/payment/mode',
-      element: <PaymentMode />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <PaymentMode />
+        </ProtectedRoute>
+      ),
     },
     {
       path: '/taxes',
-      element: <Taxes />,
+      element: (
+        <ProtectedRoute allowedRoles={['owner', 'admin']}>
+          <Taxes />
+        </ProtectedRoute>
+      ),
     },
 
     {

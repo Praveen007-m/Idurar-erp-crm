@@ -35,7 +35,7 @@ export default function AppRouter() {
   }
   
   // Handle staff redirect on initial load
-  // When staff tries to access root '/', redirect to /customer
+  // When staff tries to access root '/', redirect to /staff-dashboard
   useEffect(() => {
     if (currentAdmin && currentAdmin.role === 'staff' && location.pathname === '/') {
       // Staff will be handled by ProtectedRoute in routes

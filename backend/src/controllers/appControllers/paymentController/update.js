@@ -95,7 +95,7 @@ const update = async (req, res) => {
   ).exec();
 
   const updateInvoice = await Invoice.findOneAndUpdate(
-    { _id: result.invoice._id.toString() },
+    { _id: previousPayment.invoice._id.toString() },
     {
       $inc: { credit: changedAmount },
       $set: {

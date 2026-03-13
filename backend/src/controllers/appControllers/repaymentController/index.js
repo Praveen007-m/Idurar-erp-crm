@@ -267,7 +267,7 @@ function modelController() {
           removed: false,
         }).select('_id');
 
-        const clientIdStrings = clientIds.map((clientId) => clientId.toString());
+        const clientIdStrings = clientIds.map((c) => c._id.toString());
         if (!clientIdStrings.includes(req.body.client.toString())) {
           return res.status(403).json({
             success: false,
@@ -441,28 +441,53 @@ function modelController() {
 
   methods.read = async (req, res) => {
     try {
-      const staffFilter = await buildStaffFilter(req.admin, 'client');
+      const { id } = req.params;
+      
+      // Validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          result: null,
+          message: 'Invalid repayment ID format',
+        });
+      }
 
-      const result = await Model.findOne({
-        _id: req.params.id,
+      const repayment = await Model.findOne({
+        _id: id,
         removed: false,
-        ...staffFilter,
-      }).populate().exec();
+      }).populate('client').exec();
 
-      if (!result) {
+      if (!repayment) {
         return res.status(404).json({
           success: false,
           result: null,
-          message: 'No document found',
+          message: 'Repayment not found or has been deleted',
         });
+      }
+
+      // Staff access check - verify client assignment separately
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
+      if (req.admin?.role === 'staff' && Object.keys(staffFilter).length > 0) {
+        const hasAccess = await mongoose.model('Client').findOne({
+          _id: repayment.client._id || repayment.client,
+          ...staffFilter,
+        });
+        if (!hasAccess) {
+          return res.status(403).json({
+            success: false,
+            result: null,
+            message: 'You do not have permission to access this repayment',
+          });
+        }
       }
 
       return res.status(200).json({
         success: true,
-        result: serializeRepayment(result),
+        result: serializeRepayment(repayment),
         message: 'Successfully found document',
       });
     } catch (error) {
+      console.error('[repayment.read] error:', error);
       return res.status(500).json({
         success: false,
         result: null,
@@ -485,7 +510,8 @@ function modelController() {
           ? clientId
           : null;
 
-        if (clientObjectId && staffFilter.client.$in.includes(clientObjectId)) {
+        const allowedIds = staffFilter.client.$in.map(id => id?.toString());
+        if (clientObjectId && allowedIds.includes(clientObjectId.toString())) {
           query.client = clientId;
         } else {
           return res.status(200).json({
@@ -521,7 +547,6 @@ function modelController() {
   methods.getByClientAndDate = async (req, res) => {
     try {
       const { clientId, date } = req.query;
-      const staffFilter = await buildStaffFilter(req.admin, 'client');
 
       if (!clientId || !date) {
         return res.status(400).json({
@@ -531,43 +556,85 @@ function modelController() {
         });
       }
 
+      // Validate clientId
+      if (!mongoose.Types.ObjectId.isValid(clientId)) {
+        return res.status(400).json({
+          success: false,
+          result: null,
+          message: 'Invalid client ID',
+        });
+      }
+
       const start = new Date(date);
       const end = new Date(date);
-
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
 
+      // First try to find existing repayment (apply staff filter if staff)
+      const staffFilter = await buildStaffFilter(req.admin, 'client');
       let query = {
         client: clientId,
         date: { $gte: start, $lte: end },
         removed: false,
       };
-
+      
       if (Object.keys(staffFilter).length > 0) {
-        query = {
-          $and: [query, staffFilter],
-        };
+        query = { $and: [query, staffFilter] };
       }
 
-      const repayment = await Model.findOne(query)
+      let repayment = await Model.findOne(query)
         .sort({ date: 1, created: 1 })
-        .populate()
+        .populate('client')
         .exec();
 
+      // ✅ If NOT_STARTED repayment doesn't exist → generate virtual placeholder
       if (!repayment) {
-        return res.status(404).json({
-          success: false,
-          result: null,
-          message: 'Repayment not found',
-        });
+        const Client = mongoose.model('Client');
+        const client = await Client.findById(clientId).lean();
+
+        if (!client) {
+          return res.status(404).json({
+            success: false,
+            result: null,
+            message: 'Client not found',
+          });
+        }
+
+        // Generate installment amount from client data
+        let installmentAmount = 0;
+        const principal = Number(client.loanAmount || 0);
+        const rate = Number(client.interestRate || 0) / 100;
+        const term = parseInt(client.term || 0);
+        
+        if (principal > 0 && term > 0 && rate >= 0) {
+          const interestPerInstallment = principal * rate / term;
+          installmentAmount = principal / term + interestPerInstallment;
+        } else {
+          installmentAmount = principal / term || 0;
+        }
+
+        repayment = {
+          _id: null,
+          client: client,
+          date: start,
+          amount: Math.round(installmentAmount * 100) / 100,
+          principal: Math.round((principal / term) * 100) / 100,
+          interest: Math.round((installmentAmount - principal / term) * 100) / 100,
+          amountPaid: 0,
+          balance: Math.round(installmentAmount * 100) / 100,
+          status: 'not_started',
+          isVirtual: true,  // Frontend flag for create vs update
+          notes: `Virtual installment for ${client.name}`,
+        };
       }
 
       return res.status(200).json({
         success: true,
         result: serializeRepayment(repayment),
-        message: 'Successfully found repayment',
+        message: repayment._id ? 'Repayment found' : 'Generated virtual repayment for editing',
       });
     } catch (error) {
+      console.error('[getByClientAndDate] error:', error);
       return res.status(500).json({
         success: false,
         result: null,

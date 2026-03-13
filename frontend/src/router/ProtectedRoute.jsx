@@ -30,7 +30,7 @@ export default function ProtectedRoute({
       // User doesn't have the required role
       // Redirect based on role - staff goes to /customer
       if (userRole === 'staff') {
-        return <Navigate to="/customer" replace />;
+        return <Navigate to="/staff-dashboard" replace />;
       }
       // Default redirect for unauthorized access
       return <Navigate to="/" replace />;

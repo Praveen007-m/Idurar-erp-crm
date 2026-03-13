@@ -401,34 +401,62 @@ export default function Repayment() {
   const handleEditModalOk = async () => {
     try {
       const values = await form.validateFields();
-      const response = await request.update({
-        entity: 'repayment',
-        id: editingRepayment._id,
-        jsonData: formatRepaymentPayload(values),
-      });
-
-      if (!response?.success || !response?.result) {
-        notification.error({
-          message: translate('Update failed'),
-          description: response?.message || translate('Something went wrong'),
+      
+      // Handle virtual repayment (no _id) - CREATE new
+      if (!editingRepayment._id || editingRepayment.isVirtual) {
+        const createResponse = await request.create({
+          entity: 'repayment',
+          jsonData: formatRepaymentPayload({
+            ...editingRepayment,
+            ...values,
+          }),
         });
-        return;
+
+        if (!createResponse?.success || !createResponse?.result) {
+          notification.error({
+            message: translate('Create failed'),
+            description: createResponse?.message || translate('Something went wrong'),
+          });
+          return;
+        }
+
+        appendRepaymentToState(createResponse.result);
+        setEditingRepayment(createResponse.result);
+        window.dispatchEvent(new Event('repayment-updated'));
+        notification.success({
+          message: translate('Repayment created successfully'),
+        });
+      } else {
+        // UPDATE existing
+        const updateResponse = await request.update({
+          entity: 'repayment',
+          id: editingRepayment._id,
+          jsonData: formatRepaymentPayload(values),
+        });
+
+        if (!updateResponse?.success || !updateResponse?.result) {
+          notification.error({
+            message: translate('Update failed'),
+            description: updateResponse?.message || translate('Something went wrong'),
+          });
+          return;
+        }
+
+        updateRepaymentInState(updateResponse.result);
+        setEditingRepayment(updateResponse.result);
+        window.dispatchEvent(new Event('repayment-updated'));
+        notification.success({
+          message: translate('Repayment updated successfully'),
+        });
       }
 
-      updateRepaymentInState(response.result);
       dispatch(erp.list({ entity: 'payment' }));
-      setEditingRepayment(response.result);
       setIsEditModalOpen(false);
       form.resetFields();
-      window.dispatchEvent(new Event('repayment-updated'));
-      window.dispatchEvent(new Event('payment-updated'));
 
-      notification.success({
-        message: translate('Repayment updated successfully'),
-      });
     } catch (error) {
       notification.error({
-        message: translate('Update failed'),
+        message: translate('Operation failed'),
         description: error?.message || translate('Something went wrong'),
       });
     }

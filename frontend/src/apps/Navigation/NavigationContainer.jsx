@@ -18,7 +18,9 @@ import {
   ShopOutlined,
   WalletOutlined,
   ReconciliationOutlined,
-  TeamOutlined
+  TeamOutlined,
+  BarChartOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -48,38 +50,37 @@ function Sidebar({ collapsible, isMobile = false }) {
 
   let items = [
 
-    // DASHBOARD ONLY ADMIN
+    // DASHBOARD
     ...(isAdmin
-      ? [{
-          key: 'dashboard',
-          icon: <DashboardOutlined />,
-          label: <Link to={'/'}>{translate('dashboard')}</Link>,
-        }]
-      : []),
-
-    {
-      key: 'customer',
-      icon: <CustomerServiceOutlined />,
-      label: <Link to={'/customer'}>{translate('customers')}</Link>,
-    },
-
-    {
-      key: 'invoice',
-      icon: <ContainerOutlined />,
-      label: <Link to={'/invoice'}>{translate('invoices')}</Link>,
-    },
-
-    {
-      key: 'quote',
-      icon: <FileSyncOutlined />,
-      label: <Link to={'/quote'}>{translate('quote')}</Link>,
-    },
-
-    {
-      key: 'payment',
-      icon: <CreditCardOutlined />,
-      label: <Link to={'/payment'}>{translate('payments')}</Link>,
-    },
+      ? [
+          {
+            key: 'dashboard',
+            icon: <DashboardOutlined />,
+            label: <Link to={'/'}>{translate('dashboard')}</Link>,
+          },
+          {
+            key: 'reports',
+            icon: <ContainerOutlined />,
+            label: <Link to={'/reports'}>{translate('Reports')}</Link>,
+          },
+          {
+            key: 'performance',
+            icon: <TeamOutlined />,
+            label: <Link to={'/performance'}>{translate('Performance')}</Link>,
+          }
+        ]
+      : [
+          {
+            key: 'staff-dashboard',
+            icon: <DashboardOutlined />,
+            label: <Link to={'/staff-dashboard'}>{translate('dashboard')}</Link>,
+          },
+          {
+            key: 'performance-summary',
+            icon: <BarChartOutlined />,
+            label: <Link to={'/performance-summary'}>{translate('My Performance')}</Link>,
+          }
+        ]),
 
     {
       key: 'repayment',
@@ -88,31 +89,50 @@ function Sidebar({ collapsible, isMobile = false }) {
     },
 
     {
-      key: 'paymentMode',
-      label: <Link to={'/payment/mode'}>{translate('payments_mode')}</Link>,
-      icon: <WalletOutlined />,
+      key: 'customer',
+      icon: <UserOutlined />,
+      label: <Link to={'/customer'}>{translate('Customer')}</Link>,
     },
 
-    {
-      key: 'taxes',
-      label: <Link to={'/taxes'}>{translate('taxes')}</Link>,
-      icon: <ShopOutlined />,
-    },
-
-    // STAFF MANAGEMENT (ADMIN ONLY)
     ...(isAdmin
-      ? [{
-          key: 'staff',
-          icon: <TeamOutlined />,
-          label: <Link to={'/staff'}>{translate('staff')}</Link>,
-        }]
+      ? [
+          {
+            key: 'invoice',
+            icon: <ContainerOutlined />,
+            label: <Link to={'/invoice'}>{translate('invoices')}</Link>,
+          },
+          {
+            key: 'quote',
+            icon: <FileSyncOutlined />,
+            label: <Link to={'/quote'}>{translate('quote')}</Link>,
+          },
+          {
+            key: 'payment',
+            icon: <CreditCardOutlined />,
+            label: <Link to={'/payment'}>{translate('payments')}</Link>,
+          },
+          {
+            key: 'paymentMode',
+            label: <Link to={'/payment/mode'}>{translate('payments_mode')}</Link>,
+            icon: <WalletOutlined />,
+          },
+          {
+            key: 'taxes',
+            label: <Link to={'/taxes'}>{translate('taxes')}</Link>,
+            icon: <ShopOutlined />,
+          },
+          {
+            key: 'staff',
+            icon: <TeamOutlined />,
+            label: <Link to={'/staff'}>{translate('staff')}</Link>,
+          },
+          {
+            key: 'generalSettings',
+            label: <Link to={'/settings'}>{translate('settings')}</Link>,
+            icon: <SettingOutlined />,
+          },
+        ]
       : []),
-
-    {
-      key: 'generalSettings',
-      label: <Link to={'/settings'}>{translate('settings')}</Link>,
-      icon: <SettingOutlined />,
-    },
 
     {
       key: 'about',
@@ -199,9 +219,9 @@ function Sidebar({ collapsible, isMobile = false }) {
         <div
           className="logo"
           onClick={() => {
-            // Navigate based on role - staff goes to /customer, others go to /
+            // Navigate based on role - staff goes to /staff-dashboard, others go to /
             if (currentAdmin?.role === 'staff') {
-              navigate('/customer');
+              navigate('/staff-dashboard');
             } else {
               navigate('/');
             }

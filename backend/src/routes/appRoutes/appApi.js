@@ -7,7 +7,7 @@ const { routesList } = require('@/models/utils');
 
 // Staff/Admin controller
 const adminController = require('@/controllers/appControllers/adminController');
-
+const checkRole = require('@/middlewares/checkRole');
 
 // =============================
 // ADMIN / STAFF ROUTES
@@ -15,23 +15,38 @@ const adminController = require('@/controllers/appControllers/adminController');
 
 // List all staff
 router.route('/admin/list')
-  .get(catchErrors(adminController.list));
+  .get(checkRole(['admin', 'owner']), catchErrors(adminController.listStaff));
 
 // Create staff
 router.route('/admin/createStaff')
-  .post(catchErrors(adminController.createStaff));
+  .post(checkRole(['admin', 'owner']), catchErrors(adminController.createStaff));
 
 // Update staff
 router.route('/admin/updateStaff/:id')
-  .patch(catchErrors(adminController.updateStaff));
+  .patch(checkRole(['admin', 'owner']), catchErrors(adminController.updateStaff));
 
 // Delete staff
 router.route('/admin/deleteStaff/:id')
-  .delete(catchErrors(adminController.deleteStaff));
+  .delete(checkRole(['admin', 'owner']), catchErrors(adminController.deleteStaff));
 
 // List all staff (for dropdown)
 router.route('/admin/listAllStaff')
-  .get(catchErrors(adminController.listAllStaff));
+  .get(checkRole(['admin', 'owner']), catchErrors(adminController.listAllStaff));
+
+// =============================
+// DASHBOARD ROUTES
+// =============================
+const dashboardController = require('@/controllers/appControllers/dashboardController');
+
+router.route('/dashboard/admin')
+  .get(catchErrors(dashboardController.adminDashboard));
+
+router.route('/dashboard/staff')
+  .get(catchErrors(dashboardController.staffDashboard));
+
+router.route('/reports')
+  .get(checkRole(['admin', 'owner', 'staff']), catchErrors(dashboardController.reports));
+
 
 
 // =============================

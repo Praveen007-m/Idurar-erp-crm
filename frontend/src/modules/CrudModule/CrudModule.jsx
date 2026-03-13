@@ -24,6 +24,10 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
   const { deleteModalLabels } = config;
   const { modal, editBox } = crudContextAction;
 
+  const currentAdmin = useSelector((state) => state.auth.current);
+  const isAdmin = currentAdmin?.role === 'admin' || currentAdmin?.role === 'owner';
+  const showEditDelete = !(config.entity === 'client' && !isAdmin);
+
   const { isReadBoxOpen, isEditBoxOpen } = state;
   const { result: currentItem } = useSelector(selectCurrentItem);
   const dispatch = useDispatch();
@@ -54,24 +58,28 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
           <p style={{ marginBottom: '10px' }}>{labels}</p>
         </Col>
         <Col xs={24} md={14}>
-          <Button
-            onClick={removeItem}
-            type="text"
-            icon={<DeleteOutlined />}
-            size="small"
-            style={{ float: 'right', marginLeft: '5px', marginTop: '10px' }}
-          >
-            {translate('remove')}
-          </Button>
-          <Button
-            onClick={editItem}
-            type="text"
-            icon={<EditOutlined />}
-            size="small"
-            style={{ float: 'right', marginLeft: '0px', marginTop: '10px' }}
-          >
-            {translate('edit')}
-          </Button>
+          {showEditDelete && (
+            <>
+              <Button
+                onClick={removeItem}
+                type="text"
+                icon={<DeleteOutlined />}
+                size="small"
+                style={{ float: 'right', marginLeft: '5px', marginTop: '10px' }}
+              >
+                {translate('remove')}
+              </Button>
+              <Button
+                onClick={editItem}
+                type="text"
+                icon={<EditOutlined />}
+                size="small"
+                style={{ float: 'right', marginLeft: '0px', marginTop: '10px' }}
+              >
+                {translate('edit')}
+              </Button>
+            </>
+          )}
         </Col>
 
         <Col span={24}>
@@ -95,20 +103,26 @@ function FixHeaderPanel({ config }) {
     collapsedBox.close();
   };
 
+  const currentAdmin = useSelector((state) => state.auth.current);
+  const isAdmin = currentAdmin?.role === 'admin' || currentAdmin?.role === 'owner';
+  const showAdd = !(config.entity === 'client' && !isAdmin);
+
   return (
     <>
       {/* Add New Client Button ABOVE header */}
-      <Row justify="end" style={{ marginBottom: 16 }}>
-        <Col>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={addNewItem}
-          >
-            {config.ADD_NEW_ENTITY}
-          </Button>
-        </Col>
-      </Row>
+      {showAdd && (
+        <Row justify="end" style={{ marginBottom: 16 }}>
+          <Col>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={addNewItem}
+            >
+              {config.ADD_NEW_ENTITY}
+            </Button>
+          </Col>
+        </Row>
+      )}
 
       {/* Search + small add button row */}
       <Row gutter={8}>

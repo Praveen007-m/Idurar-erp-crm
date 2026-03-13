@@ -42,12 +42,17 @@ function modelController() {
 
   methods.create = async (req, res) => {
     try {
+      if (req.admin.role === "staff") {
+        return res.status(403).json({
+          success: false,
+          result: null,
+          message: "Permission denied: Staff cannot create customers",
+        });
+      }
+
       delete req.body.endDate;
 
-      // If logged in user is staff assign client automatically
-      if (req.admin.role === "staff") {
-        req.body.assigned = req.admin._id;
-      } else if (!req.body.assigned) {
+      if (!req.body.assigned) {
         req.body.assigned = req.admin._id;
       }
 
@@ -110,41 +115,66 @@ function modelController() {
 
   methods.list = async (req, res) => {
     try {
-      let filter = { removed: false };
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.items, 10) || 10;
+      const skip = page * limit - limit;
+      const { sortBy = 'created', sortValue = -1, filter, equal, q, fields } = req.query;
 
-      if (req.admin.role === "staff") {
-        filter.assigned = req.admin._id;
+      const fieldsArray = fields ? fields.split(',') : [];
+      let searchFields = fieldsArray.length === 0 ? {} : { $or: [] };
+
+      if (q) {
+        for (const field of fieldsArray) {
+          searchFields.$or.push({ [field]: { $regex: new RegExp(q, 'i') } });
+        }
       }
 
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.items) || 10;
-      const skip = (page - 1) * limit;
+      let filterQuery = {
+        removed: false,
+        ...searchFields,
+      };
 
-      const result = await Model.find(filter)
-        .populate('assigned', 'name email')
+      if (filter && equal) {
+        filterQuery[filter] = equal;
+      }
+
+      if (req.admin.role === "staff") {
+        filterQuery.assigned = req.admin._id;
+      }
+
+      const resultsPromise = Model.find(filterQuery)
+        .populate('assigned', 'name email role')
         .skip(skip)
         .limit(limit)
-        .sort({ created: -1 })
+        .sort({ [sortBy]: sortValue })
         .exec();
 
-      const count = await Model.countDocuments(filter);
+      const countPromise = Model.countDocuments(filterQuery);
 
-      return res.status(200).json({
+      const [result, count] = await Promise.all([resultsPromise, countPromise]);
+      const pages = Math.ceil(count / limit);
+      const pagination = { page, pages, count };
+
+      if (count > 0) {
+        return res.status(200).json({
+          success: true,
+          result,
+          pagination,
+          message: 'Successfully fetched Clients',
+        });
+      }
+
+      return res.status(203).json({
         success: true,
-        result: result,
-        pagination: {
-          page,
-          pages: Math.ceil(count / limit),
-          count,
-        },
-        message: "Successfully fetched Clients",
+        result: [],
+        pagination,
+        message: 'Collection is Empty',
       });
-
     } catch (err) {
       return res.status(500).json({
         success: false,
         result: null,
-        message: "Error fetching Clients",
+        message: 'Error fetching Clients',
         error: err,
       });
     }
@@ -152,16 +182,16 @@ function modelController() {
 
   methods.update = async (req, res) => {
     try {
+      if (req.admin.role === "staff") {
+        return res.status(403).json({
+          success: false,
+          result: null,
+          message: "Permission denied: Staff cannot update customers",
+        });
+      }
+
       let filter = { _id: req.params.id, removed: false };
 
-      if (req.admin.role === "staff") {
-        filter.assigned = req.admin._id;
-      }
-
-      // If staff, prevent changing the assigned field
-      if (req.admin.role === "staff") {
-        delete req.body.assigned;
-      }
       delete req.body.endDate;
 
       const existingClient = await Model.findOne(filter).exec();
@@ -242,11 +272,15 @@ function modelController() {
 
   methods.delete = async (req, res) => {
     try {
-      let filter = { _id: req.params.id, removed: false };
-
       if (req.admin.role === "staff") {
-        filter.assigned = req.admin._id;
+        return res.status(403).json({
+          success: false,
+          result: null,
+          message: "Permission denied: Staff cannot delete customers",
+        });
       }
+
+      let filter = { _id: req.params.id, removed: false };
 
       const result = await Model.findOneAndUpdate(
         filter,
@@ -286,25 +320,28 @@ function modelController() {
 
   methods.read = async (req, res) => {
     try {
-      const result = await Model.findOne({
-        _id: req.params.id,
-        removed: false,
-      })
-        .populate('assigned', 'name email')
+      let filter = { _id: req.params.id, removed: false };
+
+      if (req.admin.role === "staff") {
+        filter.assigned = req.admin._id;
+      }
+
+      const result = await Model.findOne(filter)
+        .populate('assigned', 'name email role')
         .exec();
 
       if (!result) {
         return res.status(404).json({
           success: false,
           result: null,
-          message: 'No document found ',
+          message: 'No document found',
         });
       }
 
       return res.status(200).json({
         success: true,
         result,
-        message: 'we found this document ',
+        message: 'Successfully found document',
       });
     } catch (err) {
       return res.status(500).json({
