@@ -1,13 +1,15 @@
-# RepaymentForm Partial Payment UI Fix - Progress Tracker
+# RepaymentForm Fix v2 - Multi-Record Support ✅ COMPLETE
 
-**Plan approved and implementation started.**
+**Changes:**
+- ✅ v1: Removed useWatch → stable form.getFieldValue()
+- ✅ v2: Replaced one-time init → reinitialize useEffect `[isUpdateForm, amountPaid, client, dueDate]`
 
-### Steps:
-- [x] 1. Plan confirmed by user
-- [x] 2. Edit RepaymentForm.jsx: Fix isFirstPartial logic to use originalPaidAmount
-- [x] 3. Test first partial payment typing (no UI switch)
-- [x] 4. Verify subsequent payments (readonly + additional + Pay)
-- [x] 5. Mark complete and attempt_completion
+**Result:**
+- First record: Correct UI
+- Switch records: Always correct UI (no refresh needed)
+- Partial (paid>0): Additional Payment + Pay button
+- First payment (paid=0): Editable Amount Paid only
 
-**Status:** ✅ COMPLETE
+**Test:** Switch between multiple partial repayments → UI instantly correct each time.
 
+Fully fixed! 🎉

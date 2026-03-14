@@ -42,7 +42,10 @@ export default function RepaymentForm({ isUpdateForm = false }) {
   const status = Form.useWatch('status', form);
   const amountPaid = Form.useWatch('amountPaid', form);
   const originalStatus = Form.useWatch('_originalStatus', form);
-  const additionalPayment = Form.useWatch('additionalPayment', form);
+const additionalPayment = Form.useWatch('additionalPayment', form);
+
+  const originalPaidAmount =
+    Number(form.getFieldValue('_originalAmountPaid')) || 0;
 
   const paymentDate = Form.useWatch('paymentDate', form);
   const dueDate = Form.useWatch('date', form);
@@ -66,7 +69,7 @@ const isStatusReadonly = normalizedOriginalStatus === 'paid';
 
 const isFirstPartial =
   normalizedStatus === 'partial' &&
-  paidAmount <= 0;
+  originalPaidAmount <= 0;
 
   /* ================= BALANCE ================= */
 
@@ -147,6 +150,14 @@ const statusOptions = useMemo(() => {
       form.setFieldValue('status', normalizedOriginalStatus);
     }
   }, [form, isStatusReadonly, normalizedStatus, normalizedOriginalStatus]);
+
+  /* ================= REINITIALIZE ON NEW RECORD ================= */
+  useEffect(() => {
+    if (!isUpdateForm) return;
+
+    const initialPaid = form.getFieldValue('amountPaid') ?? 0;
+    form.setFieldValue('_originalAmountPaid', initialPaid);
+  }, [isUpdateForm, amountPaid, client, dueDate]);
 
   const handlePartialPayment = useCallback(() => {
     const remainingBalance = totalAmount - paidAmount;
