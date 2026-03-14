@@ -28,33 +28,33 @@ const normalizeRepaymentStatus = (status) => {
   return s || 'not_started';
 };
 
-
-
 export default function RepaymentForm({ isUpdateForm = false }) {
   const translate = useLanguage();
   const { dateFormat } = useDate();
   const { TextArea } = Input;
   const form = Form.useFormInstance();
 
-  /* ================= WATCH VALUES ================= */
+  /* ================= WATCH SAFE VALUES ================= */
 
   const amount = Form.useWatch('amount', form);
   const status = Form.useWatch('status', form);
-  const amountPaid = Form.useWatch('amountPaid', form);
   const originalStatus = Form.useWatch('_originalStatus', form);
-const additionalPayment = Form.useWatch('additionalPayment', form);
-
-  const originalPaidAmount =
-    Number(form.getFieldValue('_originalAmountPaid')) || 0;
-
+  const additionalPayment = Form.useWatch('additionalPayment', form);
   const paymentDate = Form.useWatch('paymentDate', form);
   const dueDate = Form.useWatch('date', form);
   const client = Form.useWatch('client', form);
 
-/* SAFE NUMERIC VALUES — MUST BE HERE */
+  /* ❌ DO NOT WATCH amountPaid — causes typing bug */
+
+  const originalPaidAmount =
+    Number(form.getFieldValue('_originalAmountPaid')) || 0;
+
+  /* ================= SAFE NUMERIC VALUES ================= */
 
   const totalAmount = Number(amount) || 0;
-  const paidAmount = Number(amountPaid) || 0;
+
+  const paidAmount =
+    Number(form.getFieldValue('amountPaid')) || 0;
 
   const addPayment = Number(additionalPayment) || 0;
 
@@ -63,13 +63,13 @@ const additionalPayment = Form.useWatch('additionalPayment', form);
     originalStatus || status
   );
 
-const isStatusReadonly = normalizedOriginalStatus === 'paid';
+  const isStatusReadonly = normalizedOriginalStatus === 'paid';
 
   /* ================= FIRST PARTIAL LOGIC ================= */
 
-const isFirstPartial =
-  normalizedStatus === 'partial' &&
-  originalPaidAmount <= 0;
+  const isFirstPartial =
+    normalizedStatus === 'partial' &&
+    originalPaidAmount <= 0;
 
   /* ================= BALANCE ================= */
 
@@ -80,34 +80,34 @@ const isFirstPartial =
 
   /* ================= STATUS OPTIONS ================= */
 
-const statusOptions = useMemo(() => {
-  if (!isUpdateForm) return STATUS_OPTIONS;
+  const statusOptions = useMemo(() => {
+    if (!isUpdateForm) return STATUS_OPTIONS;
 
-  switch (normalizedOriginalStatus) {
-    case 'not_started':
-      return STATUS_OPTIONS.filter(o =>
-        ['paid', 'partial', 'default'].includes(o.value)
-      );
+    switch (normalizedOriginalStatus) {
+      case 'not_started':
+        return STATUS_OPTIONS.filter(o =>
+          ['paid', 'partial', 'default'].includes(o.value)
+        );
 
-    case 'default':
-      return STATUS_OPTIONS.filter(o =>
-        ['paid', 'partial'].includes(o.value)
-      );
+      case 'default':
+        return STATUS_OPTIONS.filter(o =>
+          ['paid', 'partial'].includes(o.value)
+        );
 
-    case 'partial':
-      return STATUS_OPTIONS.filter(o =>
-        ['paid'].includes(o.value)
-      );
+      case 'partial':
+        return STATUS_OPTIONS.filter(o =>
+          ['paid'].includes(o.value)
+        );
 
-    case 'paid':
-      return STATUS_OPTIONS.filter(o =>
-        o.value === 'paid'
-      );
+      case 'paid':
+        return STATUS_OPTIONS.filter(o =>
+          o.value === 'paid'
+        );
 
-    default:
-      return STATUS_OPTIONS;
-  }
-}, [isUpdateForm, normalizedOriginalStatus]);
+      default:
+        return STATUS_OPTIONS;
+    }
+  }, [isUpdateForm, normalizedOriginalStatus]);
 
   /* ================= LOCK PAID STATUS ================= */
 
@@ -117,7 +117,7 @@ const statusOptions = useMemo(() => {
     }
   }, [form, isUpdateForm, normalizedOriginalStatus]);
 
-  /* ================= AUTO SET FULL PAYMENT (PAID/LATE) ================= */
+  /* ================= AUTO SET FULL PAYMENT ================= */
 
   useEffect(() => {
     if (['paid', 'late'].includes(normalizedStatus) && totalAmount > 0) {
@@ -125,11 +125,8 @@ const statusOptions = useMemo(() => {
     }
   }, [form, normalizedStatus, totalAmount]);
 
-  /* ================= HANDLE ADDITIONAL PAYMENT ================= */
-
-
-
   /* ================= AUTO LATE DETECTION ================= */
+
   useEffect(() => {
     if (
       normalizedStatus === 'paid' &&
@@ -142,6 +139,7 @@ const statusOptions = useMemo(() => {
   }, [form, normalizedStatus, paymentDate, dueDate]);
 
   /* ================= ENFORCE READONLY STATUS ================= */
+
   useEffect(() => {
     if (
       isStatusReadonly &&
@@ -151,13 +149,16 @@ const statusOptions = useMemo(() => {
     }
   }, [form, isStatusReadonly, normalizedStatus, normalizedOriginalStatus]);
 
-  /* ================= REINITIALIZE ON NEW RECORD ================= */
+  /* ================= INITIALIZE ORIGINAL PAID ================= */
+
   useEffect(() => {
     if (!isUpdateForm) return;
 
     const initialPaid = form.getFieldValue('amountPaid') ?? 0;
     form.setFieldValue('_originalAmountPaid', initialPaid);
-  }, [isUpdateForm, amountPaid, client, dueDate]);
+  }, [isUpdateForm, client, dueDate]);
+
+  /* ================= PARTIAL PAYMENT HANDLER ================= */
 
   const handlePartialPayment = useCallback(() => {
     const remainingBalance = totalAmount - paidAmount;
@@ -261,17 +262,16 @@ const statusOptions = useMemo(() => {
             <Form.Item
               label={translate('Amount Paid')}
               name="amountPaid"
-              rules={[{ required: true, type: 'number', min: 0 }]}
+              rules={[{ required: true, message: 'Enter payment amount' }]}
             >
               <InputNumber
-                min={0}
-                precision={2}
                 style={{ width: '100%' }}
                 placeholder="Enter first payment"
+                precision={2}
+                controls={false}
               />
             </Form.Item>
           ) : (
-            /* SUBSEQUENT PAYMENTS */
             <Row gutter={12} align="middle">
               <Col span={8}>
                 <Form.Item label={translate('Amount Paid')} name="amountPaid">
@@ -296,7 +296,6 @@ const statusOptions = useMemo(() => {
               <Col span={8} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Button
                   type="primary"
-                  size="middle"
                   onClick={handlePartialPayment}
                   disabled={!additionalPayment || addPayment <= 0}
                   style={{ minWidth: 80 }}
@@ -320,7 +319,7 @@ const statusOptions = useMemo(() => {
         </>
       )}
 
-      {/* ================= PAID ================= */}
+      {/* PAID */}
       {normalizedStatus === 'paid' && (
         <Form.Item
           label={translate('Payment Date')}
