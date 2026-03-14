@@ -6,6 +6,7 @@ import { crud } from "@/redux/crud/actions";
 import { selectListItems } from "@/redux/crud/selectors";
 import { ErpLayout } from "@/layout";
 import { request } from "@/request";
+import axios from 'axios';
 import {
   validatePhoneNumber,
   handlePhoneInput,
@@ -147,8 +148,15 @@ export default function Staff() {
 
   };
 
-  // Handle Delete button click
+// Handle Delete button click
   const handleDeleteClick = (record) => {
+    console.log('Deleting staff:', record.name, 'ID:', record._id);
+
+    if (!record?._id) {
+      console.error('Invalid staff record ID:', record);
+      message.error('Invalid staff record. Cannot delete.');
+      return;
+    }
 
     Modal.confirm({
       title: "Are you sure you want to delete this staff member?",
@@ -158,26 +166,17 @@ export default function Staff() {
       cancelText: "Cancel",
       onOk: async () => {
         try {
-
-          await request.delete({
-            entity: "admin/deleteStaff/" + record._id,
-          });
-
+          await axios.delete(`/admin/deleteStaff/${record._id}`);
           message.success("Staff deleted successfully");
-
-          // refresh list
           refreshList();
-
         } catch (error) {
-
+          console.error('Delete error:', error);
           message.error(
             error?.response?.data?.message || "Failed to delete staff"
           );
-
         }
       },
     });
-
   };
 
   const handleCreateStaff = async (values) => {

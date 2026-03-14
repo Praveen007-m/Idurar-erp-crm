@@ -1,0 +1,1 @@
+# RepaymentForm.jsx Status Logic Fix\n\n## Steps\n\n- [x] 1. Update isStatusReadonly logic\n- [x] 2. Update statusOptions useMemo\n- [x] 3. Remove unused allowedTransitions\n- [ ] 4. Test form behavior\n- [ ] 5. Complete\n

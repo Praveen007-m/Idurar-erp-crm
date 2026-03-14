@@ -356,6 +356,28 @@ function modelController() {
         });
       }
 
+      // 🔒 PARTIAL payment validation - cannot reduce amountPaid
+      if (normalizeStatus(existingRepayment.status) === 'partial') {
+        const newAmountPaid = normalizeNumber(repaymentData.amountPaid);
+        const existingAmountPaid = normalizeNumber(existingRepayment.amountPaid);
+        
+        if (newAmountPaid < existingAmountPaid) {
+          return res.status(400).json({
+            success: false,
+            result: null,
+            message: 'Cannot reduce already paid amount for partial payments. Use additional payment workflow.',
+          });
+        }
+        
+        if (newAmountPaid > normalizeNumber(existingRepayment.amount)) {
+          return res.status(400).json({
+            success: false,
+            result: null,
+            message: 'Paid amount cannot exceed total amount',
+          });
+        }
+      }
+
       delete repaymentData.status;
       delete repaymentData.balance;
 

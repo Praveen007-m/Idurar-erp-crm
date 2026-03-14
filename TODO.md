@@ -1,17 +1,13 @@
-# Finance Collection Analytics Fix - TODO
+# RepaymentForm Partial Payment UI Fix - Progress Tracker
 
-## Plan Steps:
-1. [x] Create TODO.md (DONE)
-2. [x] Edit backend/src/controllers/appControllers/dashboardController.js - Fix ALL Payment -> Repayment.amountPaid aggs (DONE: Replaced 7 aggregations in adminDashboard, staffDashboard, reports; Optimized staff status agg)
-3. [ ] Test endpoints return non-zero data
-4. [x] Update TODO.md progress
-5. [ ] attempt_completion
+**Plan approved and implementation started.**
 
-**Current: Edits complete. Restart backend server to test: `cd backend && npm start`
+### Steps:
+- [x] 1. Plan confirmed by user
+- [x] 2. Edit RepaymentForm.jsx: Fix isFirstPartial logic to use originalPaidAmount
+- [x] 3. Test first partial payment typing (no UI switch)
+- [x] 4. Verify subsequent payments (readonly + additional + Pay)
+- [x] 5. Mark complete and attempt_completion
 
-Metrics now use Repayment.amountPaid for collected, Repayment.balance for pending.
-Admin: Global data
-Staff: assigned clients only
-Reports: RBAC filtered**
-
+**Status:** ✅ COMPLETE
 
