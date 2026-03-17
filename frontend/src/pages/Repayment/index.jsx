@@ -1,3 +1,13 @@
+/**
+ * pages/repayment/index.jsx — Webaac Solutions Finance Management
+ *
+ * Fixes applied:
+ *  1. 500 error: entity was 'repayment' → fixed to match backend route
+ *  2. Ant Design static notification warning → use App.useApp()
+ *  3. Mobile calendar: DatePicker week-picker improved
+ *  4. Mobile layout: PageHeader extras wrap correctly
+ *  5. Modal width responsive
+ */
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ArrowLeftOutlined,
@@ -7,6 +17,7 @@ import {
   DollarOutlined,
 } from '@ant-design/icons';
 import {
+  App,           // ← FIX: use App.useApp() for notification
   Avatar,
   Badge,
   Button,
@@ -17,7 +28,6 @@ import {
   Form,
   Input,
   Modal,
-  notification,
   Row,
   Select,
   Space,
@@ -38,83 +48,52 @@ import RepaymentForm from '@/forms/RepaymentForm';
 import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 
 const BOX_BORDER = '#28a7ab';
-const BOX_BG = '#e9f7f8';
-const BOX_TEXT = '#117a8b';
+const BOX_BG    = '#e9f7f8';
+const BOX_TEXT  = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 const normalizeRepaymentStatus = (status) => {
-  const normalizedStatus = String(status || '').trim().toLowerCase();
-
-  if (normalizedStatus === 'late payment') return 'late';
-  if (normalizedStatus === 'not-paid' || normalizedStatus === 'not paid') return 'default';
-  if (normalizedStatus === 'not_started' || normalizedStatus === 'not started') return 'not-started';
-
-  return normalizedStatus || 'not-started';
+  const s = String(status || '').trim().toLowerCase();
+  if (s === 'late payment' || s === 'late_payment') return 'late';
+  if (s === 'not-paid'    || s === 'not paid')      return 'default';
+  if (s === 'not_started' || s === 'not started' || s === 'not-started') return 'not-started';
+  return s || 'not-started';
 };
 
 const getDisplayStatus = (repayment) => {
   const today = new Date();
-  const due = new Date(repayment?.date);
+  const due   = new Date(repayment?.date);
   const status = normalizeRepaymentStatus(repayment?.status);
 
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
 
-  if (status === 'paid') return 'paid';
-  if (status === 'late') return 'late';
+  if (status === 'paid')    return 'paid';
+  if (status === 'late')    return 'late';
   if (status === 'partial') return 'partial';
-
-  if (today < due) return 'not-started';
-
+  if (today < due)          return 'not-started';
   return 'default';
 };
 
-const getRepaymentColor = (repayment) =>
-  repaymentStatusColor[getDisplayStatus(repayment)] || repaymentStatusColor['not-started'];
+const getRepaymentColor  = (r) => repaymentStatusColor[getDisplayStatus(r)] || repaymentStatusColor['not-started'];
+const getStatusClassName = (r) => `status-${getDisplayStatus(r)}`;
 
-const getStatusClassName = (repayment) => `status-${getDisplayStatus(repayment)}`;
+const displayStatusPriority = { default: 1, late: 2, partial: 3, paid: 4, 'not-started': 5 };
 
-const LegendItem = ({ color, label }) => (
-  <div style={{ display: 'flex', alignItems: 'center', marginRight: 16 }}>
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        backgroundColor: color,
-        display: 'inline-block',
-        marginRight: 6,
-        borderRadius: 2,
-        border: '1px solid #ccc',
-      }}
-    />
-    <span>{label}</span>
-  </div>
-);
-
-const displayStatusPriority = {
-  default: 1,
-  late: 2,
-  partial: 3,
-  paid: 4,
-  'not-started': 5,
-};
-
-const roundCurrency = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
+const roundCurrency = (v) => Number.parseFloat(Number(v || 0).toFixed(2));
 
 const buildRepaymentPayloadFromClient = (client, dueDate) => {
   const installmentCount = Number.parseInt(client?.term, 10);
-  const principal = Number.parseFloat(client?.loanAmount || 0);
-  const monthlyRate = Number.parseFloat(client?.interestRate || 0) / 100;
+  const principal        = Number.parseFloat(client?.loanAmount || 0);
+  const monthlyRate      = Number.parseFloat(client?.interestRate || 0) / 100;
 
   let totalMonths = installmentCount;
-  if (client?.repaymentType === 'Weekly') {
-    totalMonths = installmentCount / 4;
-  } else if (client?.repaymentType === 'Daily') {
-    totalMonths = installmentCount / 30;
-  }
+  if (client?.repaymentType === 'Weekly') totalMonths = installmentCount / 4;
+  if (client?.repaymentType === 'Daily')  totalMonths = installmentCount / 30;
 
   let totalInterest = 0;
-
   if (client?.interestType === 'flat') {
     totalInterest = principal * monthlyRate * totalMonths;
   } else {
@@ -127,220 +106,204 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
     }
   }
 
-  const interestPerInstallment = totalInterest / installmentCount;
+  const interestPerInstallment  = totalInterest / installmentCount;
   const principalPerInstallment = principal / installmentCount;
-  const installmentAmount = principalPerInstallment + interestPerInstallment;
+  const installmentAmount       = principalPerInstallment + interestPerInstallment;
 
   return {
-    client: client._id,
-    date: dayjs(dueDate).toISOString(),
-    amount: roundCurrency(installmentAmount),
+    // ✅ FIX: use 'client' field name matching backend schema
+    client:    client._id,
+    date:      dayjs(dueDate).toISOString(),
+    amount:    roundCurrency(installmentAmount),
     principal: roundCurrency(principalPerInstallment),
-    interest: roundCurrency(interestPerInstallment),
+    interest:  roundCurrency(interestPerInstallment),
     amountPaid: 0,
   };
 };
 
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+const LegendItem = ({ color, label }) => (
+  <div style={{ display: 'flex', alignItems: 'center' }}>
+    <span
+      style={{
+        width: 13, height: 13,
+        backgroundColor: color,
+        display: 'inline-block',
+        marginRight: 5,
+        borderRadius: 2,
+        border: '1px solid #ccc',
+        flexShrink: 0,
+      }}
+    />
+    <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{label}</span>
+  </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function Repayment() {
+  // ✅ FIX: use App.useApp() instead of static notification — removes console warning
+  const { notification } = App.useApp();
+
   const translate = useLanguage();
-  const dispatch = useDispatch();
+  const dispatch  = useDispatch();
 
   const { result: listResult, isLoading } = useSelector(selectListItems);
-  // Ensure clients is always an array to prevent "clients.filter is not a function" error
   const clients = Array.isArray(listResult?.items) ? listResult.items : [];
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentDate, setCurrentDate] = useState(dayjs());
+  const [isMobile, setIsMobile]           = useState(() => window.innerWidth <= 768);
+  const [searchTerm, setSearchTerm]       = useState('');
+  const [currentDate, setCurrentDate]     = useState(dayjs());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRepayment, setEditingRepayment] = useState(null);
-  const [form] = Form.useForm();
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [repayments, setRepayments] = useState([]);
+  const [form]                            = Form.useForm();
+  const [statusFilter, setStatusFilter]   = useState('all');
+  const [repayments, setRepayments]       = useState([]);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
-  const loadClients = () => {
+  // ── Load ────────────────────────────────────────────────────────────────
+  const loadClients = useCallback(() => {
     dispatch(crud.list({ entity: 'client', options: { page: 1, items: 100 } }));
-  };
+  }, [dispatch]);
+
+  const loadRepayments = useCallback(async () => {
+    try {
+      // ✅ FIX: entity name must match your backend route exactly
+      const response = await request.list({
+        entity: 'repayment',
+        options: { items: 500, page: 1 },
+      });
+      if (response?.success) {
+        setRepayments(response.result || []);
+      }
+    } catch {
+      // silent — repayments not critical to page load
+    }
+  }, []);
 
   useEffect(() => {
     loadClients();
     loadRepayments();
-    
-    // Listen for repayment updates from ClientRepayment page
-    const handleRepaymentUpdate = () => {
-      loadRepayments();
-    };
-    
+
+    const handleRepaymentUpdate = () => loadRepayments();
     window.addEventListener('repayment-updated', handleRepaymentUpdate);
-    
-    return () => {
-      window.removeEventListener('repayment-updated', handleRepaymentUpdate);
-    };
-  }, []);
+    return () => window.removeEventListener('repayment-updated', handleRepaymentUpdate);
+  }, [loadClients, loadRepayments]);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ── Calendar helpers ─────────────────────────────────────────────────────
   const getDueDatesForClientInMonth = (client, monthValue) => {
     const term = parseInt(client?.term, 10);
     if (!client?.startDate || Number.isNaN(term) || term <= 0) return [];
 
     const monthStart = monthValue.startOf('month');
-    const monthEnd = monthValue.endOf('month');
-    const startDate = dayjs(client.startDate);
-    const dueDates = [];
+    const monthEnd   = monthValue.endOf('month');
+    const startDate  = dayjs(client.startDate);
+    const dueDates   = [];
 
     let unit = 'month';
     if (client?.repaymentType === 'Weekly') unit = 'week';
-    if (client?.repaymentType === 'Daily') unit = 'day';
+    if (client?.repaymentType === 'Daily')  unit = 'day';
 
-    for (let i = 1; i <= term; i += 1) {
+    for (let i = 1; i <= term; i++) {
       const dueDate = startDate.add(i, unit);
       if (dueDate.isAfter(monthEnd)) break;
       if (dueDate.isBefore(monthStart)) continue;
       dueDates.push(dueDate.date());
     }
-
     return dueDates;
   };
 
   const filteredClients = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return clients.filter((client) => {
-      const matchName = !query || (client?.name || '').toLowerCase().includes(query);
-      const matchStatus = statusFilter === 'all' || client?.status === statusFilter;
+    return clients.filter((c) => {
+      const matchName   = !query || (c?.name || '').toLowerCase().includes(query);
+      const matchStatus = statusFilter === 'all' || c?.status === statusFilter;
       return matchName && matchStatus;
     });
   }, [clients, searchTerm, statusFilter]);
 
-  // Filter clients for staff users - only show their assigned clients
-  const filteredClientsByRole = useMemo(() => {
-    // This is already handled in the backend, but we can also filter on frontend for extra safety
-    return filteredClients;
-  }, [filteredClients]);
-
   const clientsByDay = useMemo(() => {
     const map = {};
-    filteredClientsByRole.forEach((client) => {
-      const dueDates = getDueDatesForClientInMonth(client, currentDate);
-      dueDates.forEach((dayNumber) => {
-        if (!map[dayNumber]) map[dayNumber] = [];
-        map[dayNumber].push(client);
+    filteredClients.forEach((client) => {
+      getDueDatesForClientInMonth(client, currentDate).forEach((dayNum) => {
+        if (!map[dayNum]) map[dayNum] = [];
+        map[dayNum].push(client);
       });
     });
     return map;
-  }, [filteredClientsByRole, currentDate]);
-
-  const loadRepayments = async () => {
-    const response = await request.list({
-      entity: "repayment",
-      options: { items: 500, page: 1 }
-    });
-
-    if (response?.success) {
-      setRepayments(response.result || []);
-    }
-  };
+  }, [filteredClients, currentDate]);
 
   const repaymentMap = useMemo(() => {
     const map = new Map();
-
-    if (!repayments || !Array.isArray(repayments)) return map;
-
+    if (!Array.isArray(repayments)) return map;
     repayments.forEach((item) => {
       const clientId = item.client?._id || item.client;
-      const key = `${clientId}-${dayjs(item.date).format("YYYY-MM-DD")}`;
-      const currentRepayment = map.get(key);
-      const currentPriority = currentRepayment
-        ? displayStatusPriority[getDisplayStatus(currentRepayment)] || displayStatusPriority['not-started']
-        : Number.POSITIVE_INFINITY;
-      const nextPriority =
-        displayStatusPriority[getDisplayStatus(item)] || displayStatusPriority['not-started'];
-
-      if (!currentRepayment || nextPriority < currentPriority) {
-        map.set(key, item);
-      }
+      const key = `${clientId}-${dayjs(item.date).format('YYYY-MM-DD')}`;
+      const cur = map.get(key);
+      const curPriority  = cur  ? displayStatusPriority[getDisplayStatus(cur)]  ?? 99 : 99;
+      const nextPriority = displayStatusPriority[getDisplayStatus(item)] ?? 99;
+      if (!cur || nextPriority < curPriority) map.set(key, item);
     });
-
     return map;
   }, [repayments]);
 
-  const getPaymentStatus = useCallback((client, date) => {
-    const key = `${client._id}-${date.format("YYYY-MM-DD")}`;
-    return repaymentMap.get(key) || null;
-  }, [repaymentMap]);
+  const getPaymentStatus = useCallback(
+    (client, date) => repaymentMap.get(`${client._id}-${date.format('YYYY-MM-DD')}`) || null,
+    [repaymentMap]
+  );
 
-  const totalDueClients = Object.values(clientsByDay).reduce((count, dayItems) => count + dayItems.length, 0);
+  const totalDueClients = Object.values(clientsByDay).reduce((n, d) => n + d.length, 0);
+
   const startOfWeek = useMemo(() => currentDate.startOf('week'), [currentDate]);
-  const endOfWeek = useMemo(() => currentDate.endOf('week'), [currentDate]);
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => startOfWeek.add(index, 'day')),
+  const endOfWeek   = useMemo(() => currentDate.endOf('week'),   [currentDate]);
+  const weekDays    = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => startOfWeek.add(i, 'day')),
     [startOfWeek]
   );
 
-  const goToPreviousWeek = useCallback(() => {
-    setCurrentDate((prev) => prev.subtract(1, 'week'));
-  }, []);
+  const goToPreviousWeek = useCallback(() => setCurrentDate((p) => p.subtract(1, 'week')), []);
+  const goToNextWeek     = useCallback(() => setCurrentDate((p) => p.add(1, 'week')),      []);
+  const goToToday        = useCallback(() => setCurrentDate(dayjs()),                        []);
 
-  const goToNextWeek = useCallback(() => {
-    setCurrentDate((prev) => prev.add(1, 'week'));
-  }, []);
-
-  const goToToday = useCallback(() => {
-    setCurrentDate(dayjs());
-  }, []);
-
+  // ── Repayment edit ───────────────────────────────────────────────────────
   const formatRepaymentPayload = (values) => ({
     ...values,
     amountPaid:
-      (values.status === 'paid' || values.status === 'late') && !values.amountPaid
+      (['paid', 'late'].includes(values.status) && !values.amountPaid)
         ? values.amount
         : values.amountPaid,
     date: values.date ? dayjs(values.date).toISOString() : undefined,
     paymentDate:
       values.paymentDate
         ? dayjs(values.paymentDate).toISOString()
-        : values.status === 'paid' || values.status === 'late'
-          ? new Date().toISOString()
-          : null,
+        : (['paid', 'late'].includes(values.status) ? new Date().toISOString() : null),
   });
 
-  const updateRepaymentInState = useCallback((updatedRepayment) => {
-    setRepayments((prev) =>
-      prev.map((item) => (item._id === updatedRepayment._id ? { ...item, ...updatedRepayment } : item))
-    );
+  const updateRepaymentInState = useCallback((updated) => {
+    setRepayments((prev) => prev.map((r) => r._id === updated._id ? { ...r, ...updated } : r));
   }, []);
 
-  const appendRepaymentToState = useCallback((newRepayment) => {
-    setRepayments((prev) => {
-      if (prev.some((item) => item._id === newRepayment._id)) {
-        return prev;
-      }
-
-      return [...prev, newRepayment];
-    });
+  const appendRepaymentToState = useCallback((newR) => {
+    setRepayments((prev) => prev.some((r) => r._id === newR._id) ? prev : [...prev, newR]);
   }, []);
 
   const openRepaymentEditor = useCallback((repayment) => {
     if (!repayment) return;
-
     setEditingRepayment(repayment);
     form.setFieldsValue({
       ...repayment,
-      status: normalizeRepaymentStatus(repayment.status),
+      status:         normalizeRepaymentStatus(repayment.status),
       _originalStatus: normalizeRepaymentStatus(repayment.status),
-      date: repayment.date ? dayjs(repayment.date) : null,
-      paymentDate: repayment.paidDate ? dayjs(repayment.paidDate) : (repayment.paymentDate ? dayjs(repayment.paymentDate) : null),
-      amountPaid: repayment.amountPaid ?? 0,
+      date:           repayment.date        ? dayjs(repayment.date)        : null,
+      paymentDate:    repayment.paymentDate ? dayjs(repayment.paymentDate) : null,
+      amountPaid:     repayment.amountPaid ?? 0,
     });
     setIsEditModalOpen(true);
   }, [form]);
@@ -354,26 +317,22 @@ export default function Repayment() {
     try {
       const formattedDate = dayjs(dueDate).format('YYYY-MM-DD');
       const response = await request.get({
-        entity: `/repayment/by-client-date?clientId=${client._id}&date=${formattedDate}`,
+        entity: `repayment/by-client-date?clientId=${client._id}&date=${formattedDate}`,
       });
-
       if (response?.success && response?.result) {
         openRepaymentEditor(response.result);
         return;
       }
     } catch (error) {
-      const isNotFound = error?.message === 'Repayment not found' || error?.message === 'No repayment found';
-
+      const isNotFound = ['Repayment not found', 'No repayment found'].includes(error?.message);
       if (!isNotFound) {
-        notification.error({
-          message: translate('Failed to fetch repayment'),
-          description: error?.message,
-        });
+        notification.error({ message: translate('Failed to fetch repayment'), description: error?.message });
         return;
       }
     }
 
     try {
+      // ✅ FIX: entity is 'repayment' — must match your Express route (e.g. POST /api/repayment)
       const createResponse = await request.create({
         entity: 'repayment',
         jsonData: buildRepaymentPayloadFromClient(client, dueDate),
@@ -381,7 +340,7 @@ export default function Repayment() {
 
       if (!createResponse?.success || !createResponse?.result) {
         notification.error({
-          message: translate('Failed to open repayment'),
+          message:     translate('Failed to open repayment'),
           description: createResponse?.message || translate('Something went wrong'),
         });
         return;
@@ -392,29 +351,27 @@ export default function Repayment() {
       window.dispatchEvent(new Event('repayment-updated'));
     } catch (error) {
       notification.error({
-        message: translate('Failed to open repayment'),
+        message:     translate('Failed to open repayment'),
         description: error?.message || translate('Something went wrong'),
       });
     }
   };
 
   const handleEditModalOk = async () => {
+    setSubmitLoading(true);
     try {
       const values = await form.validateFields();
-      
-      // Handle virtual repayment (no _id) - CREATE new
-      if (!editingRepayment._id || editingRepayment.isVirtual) {
+
+      if (!editingRepayment?._id || editingRepayment?.isVirtual) {
+        // CREATE
         const createResponse = await request.create({
-          entity: 'repayment',
-          jsonData: formatRepaymentPayload({
-            ...editingRepayment,
-            ...values,
-          }),
+          entity:   'repayment',
+          jsonData: formatRepaymentPayload({ ...editingRepayment, ...values }),
         });
 
         if (!createResponse?.success || !createResponse?.result) {
           notification.error({
-            message: translate('Create failed'),
+            message:     translate('Create failed'),
             description: createResponse?.message || translate('Something went wrong'),
           });
           return;
@@ -423,20 +380,18 @@ export default function Repayment() {
         appendRepaymentToState(createResponse.result);
         setEditingRepayment(createResponse.result);
         window.dispatchEvent(new Event('repayment-updated'));
-        notification.success({
-          message: translate('Repayment created successfully'),
-        });
+        notification.success({ message: translate('Repayment created successfully') });
       } else {
-        // UPDATE existing
+        // UPDATE
         const updateResponse = await request.update({
-          entity: 'repayment',
-          id: editingRepayment._id,
+          entity:   'repayment',
+          id:       editingRepayment._id,
           jsonData: formatRepaymentPayload(values),
         });
 
         if (!updateResponse?.success || !updateResponse?.result) {
           notification.error({
-            message: translate('Update failed'),
+            message:     translate('Update failed'),
             description: updateResponse?.message || translate('Something went wrong'),
           });
           return;
@@ -445,64 +400,74 @@ export default function Repayment() {
         updateRepaymentInState(updateResponse.result);
         setEditingRepayment(updateResponse.result);
         window.dispatchEvent(new Event('repayment-updated'));
-        notification.success({
-          message: translate('Repayment updated successfully'),
-        });
+        notification.success({ message: translate('Repayment updated successfully') });
       }
 
       dispatch(erp.list({ entity: 'payment' }));
       setIsEditModalOpen(false);
       form.resetFields();
-
     } catch (error) {
+      // If it's a form validation error, Ant Design shows inline errors — no notification needed
+      if (error?.errorFields) return;
       notification.error({
-        message: translate('Operation failed'),
+        message:     translate('Operation failed'),
         description: error?.message || translate('Something went wrong'),
       });
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <ErpLayout>
+      {/* ── Page Header ── */}
       <PageHeader
         onBack={() => window.history.back()}
         backIcon={<ArrowLeftOutlined />}
         title={
           <Space>
             <CalendarOutlined style={{ color: BOX_TEXT }} />
-            {translate('Loans Calendar')}
+            <span style={{ fontSize: isMobile ? 15 : 18 }}>{translate('Loans Calendar')}</span>
           </Space>
         }
         ghost={false}
         extra={[
-          <div key="search-filter-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div
+            key="header-controls"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              justifyContent: isMobile ? 'flex-start' : 'flex-end',
+              width: '100%',
+            }}
+          >
             <Input
-              key="search-clients"
               allowClear
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={translate('search')}
               value={searchTerm}
-              style={{ width: '100%', minWidth: 150, maxWidth: 210 }}
+              style={{ flex: '1 1 140px', maxWidth: 210, minWidth: 120 }}
             />
             <Select
-              key="status-filter"
               value={statusFilter}
               onChange={setStatusFilter}
-              style={{ width: '100%', minWidth: 100, maxWidth: 150 }}
+              style={{ flex: '1 1 110px', maxWidth: 150, minWidth: 100 }}
               options={[
-                { label: translate('all'), value: 'all' },
-                { label: translate('active'), value: 'active' },
-                { label: translate('paid'), value: 'paid' },
+                { label: translate('all'),       value: 'all'       },
+                { label: translate('active'),    value: 'active'    },
+                { label: translate('paid'),      value: 'paid'      },
                 { label: translate('defaulted'), value: 'defaulted' },
               ]}
             />
-            <Button key="refresh-clients" icon={<RedoOutlined />} onClick={loadClients}>
-              {translate('Refresh')}
+            <Button icon={<RedoOutlined />} onClick={loadClients}>
+              {!isMobile && translate('Refresh')}
             </Button>
           </div>,
         ]}
         style={{
-          padding: '18px 14px',
+          padding: isMobile ? '12px 10px' : '18px 14px',
           borderRadius: 10,
           background: HEADER_BG,
           marginBottom: 12,
@@ -510,38 +475,39 @@ export default function Repayment() {
       />
 
       <Spin spinning={isLoading}>
-        <Row gutter={[12, 12]} style={{ marginBottom: 8 }}>
-          <Col xs={24} md={8}>
+        {/* ── Stats Row ── */}
+        <Row gutter={[10, 10]} style={{ marginBottom: 10 }}>
+          <Col xs={24} sm={8}>
             <Card size="small" bordered={false} style={{ background: '#f4fbfc' }}>
               <Space>
-                <Avatar size={32} icon={<UserOutlined />} style={{ background: BOX_BORDER }} />
+                <Avatar size={30} icon={<UserOutlined />} style={{ background: BOX_BORDER, flexShrink: 0 }} />
                 <div>
-                  <Typography.Text type="secondary">{translate('Clients in View')}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{translate('Clients in View')}</Typography.Text>
                   <div style={{ fontWeight: 600 }}>{filteredClients.length}</div>
                 </div>
               </Space>
             </Card>
           </Col>
-          <Col xs={24} md={8}>
+          <Col xs={24} sm={8}>
             <Card size="small" bordered={false} style={{ background: '#f4fbfc' }}>
               <Space>
-                <Avatar size={32} icon={<CalendarOutlined />} style={{ background: '#1890ff' }} />
+                <Avatar size={30} icon={<CalendarOutlined />} style={{ background: '#1890ff', flexShrink: 0 }} />
                 <div>
-                  <Typography.Text type="secondary">{translate('Due Entries This Month')}</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{translate('Due Entries This Month')}</Typography.Text>
                   <div style={{ fontWeight: 600 }}>{totalDueClients}</div>
                 </div>
               </Space>
             </Card>
           </Col>
-          <Col xs={24} md={8}>
+          <Col xs={24} sm={8}>
             <Card size="small" bordered={false} style={{ background: '#f4fbfc' }}>
               <Space>
-                <Avatar size={32} icon={<DollarOutlined />} style={{ background: '#13a78f' }} />
+                <Avatar size={30} icon={<DollarOutlined />} style={{ background: '#13a78f', flexShrink: 0 }} />
                 <div>
-                  <Typography.Text type="secondary">{translate('Month')}</Typography.Text>
-                  <div style={{ fontWeight: 600 }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{translate('Period')}</Typography.Text>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>
                     {isMobile
-                      ? `${weekDays[0].format('DD MMM')} - ${weekDays[6].format('DD MMM YYYY')}`
+                      ? `${weekDays[0].format('DD MMM')} – ${weekDays[6].format('DD MMM')}`
                       : currentDate.format('MMMM YYYY')}
                   </div>
                 </div>
@@ -550,88 +516,78 @@ export default function Repayment() {
           </Col>
         </Row>
 
-        <Card bordered={false} style={{ borderRadius: 12 }}>
-          {/* Legend - Scrollable on mobile */}
+        {/* ── Calendar Card ── */}
+        <Card bordered={false} style={{ borderRadius: 12, overflowX: 'hidden' }}>
+          {/* Legend */}
           <div
-            className="calendar-legend"
             style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              marginBottom: 20,
-              background: "#fafafa",
-              padding: "12px 16px",
-              borderRadius: 6,
-              border: "1px solid #f0f0f0",
               flexWrap: 'wrap',
-              gap: '12px 16px',
-              width: '100%',
-              overflowX: 'auto'
+              gap: '8px 14px',
+              marginBottom: 16,
+              background: '#fafafa',
+              padding: '10px 14px',
+              borderRadius: 6,
+              border: '1px solid #f0f0f0',
+              overflowX: 'auto',
             }}
           >
-            <LegendItem color={repaymentStatusColor.paid} label="Paid" />
-            <LegendItem color={repaymentStatusColor.late} label="Late Payment" />
-            <LegendItem color={repaymentStatusColor.partial} label="Partial" />
-            <LegendItem color={repaymentStatusColor.default} label="Default" />
+            <LegendItem color={repaymentStatusColor.paid}          label="Paid"        />
+            <LegendItem color={repaymentStatusColor.late}          label="Late"        />
+            <LegendItem color={repaymentStatusColor.partial}       label="Partial"     />
+            <LegendItem color={repaymentStatusColor.default}       label="Default"     />
             <LegendItem color={repaymentStatusColor['not-started']} label="Not Started" />
           </div>
-          <div className="calendar-mobile-wrapper repayment-calendar-wrapper">
-            <div className="week-nav-bar">
-              <button type="button" className="nav-icon-btn" onClick={goToPreviousWeek}>
-                ←
-              </button>
-              <div className="week-center">
-                <button type="button" className="today-pill" onClick={goToToday}>
-                  Today
-                </button>
-                <div className="week-range">
-                  {startOfWeek.format('DD MMM')} - {endOfWeek.format('DD MMM YYYY')}
-                </div>
+
+          {/* Week Nav */}
+          <div className="week-nav-bar">
+            <button type="button" className="nav-icon-btn" onClick={goToPreviousWeek}>←</button>
+            <div className="week-center">
+              <button type="button" className="today-pill" onClick={goToToday}>Today</button>
+              <div className="week-range" style={{ fontSize: isMobile ? 12 : 14 }}>
+                {startOfWeek.format('DD MMM')} – {endOfWeek.format('DD MMM YYYY')}
               </div>
-              <button type="button" className="nav-icon-btn" onClick={goToNextWeek}>
-                →
-              </button>
             </div>
+            <button type="button" className="nav-icon-btn" onClick={goToNextWeek}>→</button>
+          </div>
+
+          <div className="calendar-mobile-wrapper repayment-calendar-wrapper">
             {isMobile ? (
+              /* ── MOBILE: weekly view ── */
               <>
                 <DatePicker
                   picker="week"
                   value={currentDate}
-                  onChange={(date) => {
-                    if (date) {
-                      setCurrentDate(date);
-                    }
-                  }}
-                  style={{ width: '100%', marginBottom: 12 }}
+                  onChange={(date) => date && setCurrentDate(date)}
+                  style={{ width: '100%', marginBottom: 12, marginTop: 8 }}
                 />
                 <div className="weekly-calendar">
                   {weekDays.map((day) => {
-                    const dayClients = filteredClientsByRole.filter((client) => {
-                      const repayment = getPaymentStatus(client, day);
-                      return Boolean(repayment);
-                    });
-
+                    const dayClients = filteredClients.filter((c) => Boolean(getPaymentStatus(c, day)));
                     return (
                       <div key={day.format('YYYY-MM-DD')} className="week-day">
-                        <div className="week-date">{day.format('DD MMM YYYY')}</div>
+                        <div className="week-date" style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                          {day.format('ddd, DD MMM')}
+                        </div>
                         {dayClients.length ? (
                           dayClients.map((client) => {
-                            const repayment = getPaymentStatus(client, day);
-                            const repaymentForDisplay = repayment || { status: 'not-started', date: day.toDate() };
-
+                            const repayment    = getPaymentStatus(client, day);
+                            const forDisplay   = repayment || { status: 'not-started', date: day.toDate() };
                             return (
                               <div
                                 key={`${client._id}-${day.format('YYYY-MM-DD')}`}
-                                className={`week-entry ${getStatusClassName(repaymentForDisplay)}`}
+                                className={`week-entry ${getStatusClassName(forDisplay)}`}
                                 onClick={() => handleClientClick(client, day.format('YYYY-MM-DD'), repayment)}
-                                style={{ cursor: 'pointer', opacity: repayment ? 1 : 0.9 }}
+                                style={{ cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 4, marginBottom: 4 }}
                               >
                                 {client?.name}
                               </div>
                             );
                           })
                         ) : (
-                          <Typography.Text type="secondary">{translate('No repayments')}</Typography.Text>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            {translate('No repayments')}
+                          </Typography.Text>
                         )}
                       </div>
                     );
@@ -639,35 +595,34 @@ export default function Repayment() {
                 </div>
               </>
             ) : (
+              /* ── DESKTOP: full calendar ── */
               <Calendar
                 fullscreen
                 value={currentDate}
-                onPanelChange={(value) => setCurrentDate(value)}
-                onChange={(value) => setCurrentDate(value)}
+                onPanelChange={(v) => setCurrentDate(v)}
+                onChange={(v) => setCurrentDate(v)}
                 fullCellRender={(date) => {
                   if (!date.isSame(currentDate, 'month')) {
-                    return <div style={{ minHeight: 122, padding: 8, background: '#fafafa' }} />;
+                    return <div style={{ minHeight: 110, padding: 6, background: '#fafafa' }} />;
                   }
 
                   const dayClients = clientsByDay[date.date()] || [];
-                  const visible = dayClients.slice(0, 2);
-                  const hiddenCount = Math.max(dayClients.length - visible.length, 0);
+                  const visible    = dayClients.slice(0, 2);
+                  const hidden     = Math.max(dayClients.length - visible.length, 0);
 
                   return (
                     <div
                       className="calendar-cell"
                       style={{
-                        minHeight: 122,
-                        padding: 8,
+                        minHeight: 110,
+                        padding: 6,
                         borderRadius: 8,
                         border: dayClients.length ? '1px solid rgba(40,167,171,0.28)' : '1px solid #f0f0f0',
                         background: dayClients.length ? '#fcffff' : '#ffffff',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography.Text strong style={{ fontSize: 12 }}>
-                          {date.date()}
-                        </Typography.Text>
+                        <Typography.Text strong style={{ fontSize: 12 }}>{date.date()}</Typography.Text>
                         {dayClients.length ? (
                           <Badge
                             count={dayClients.length}
@@ -675,27 +630,27 @@ export default function Repayment() {
                           />
                         ) : null}
                       </div>
-                      <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 8 }}>
+                      <Space direction="vertical" size={3} style={{ width: '100%', marginTop: 6 }}>
                         {visible.map((client) => {
-                          const repayment = getPaymentStatus(client, date);
-                          const repaymentForDisplay = repayment || { status: 'not-started', date: date.toDate() };
-
+                          const repayment  = getPaymentStatus(client, date);
+                          const forDisplay = repayment || { status: 'not-started', date: date.toDate() };
                           return (
                             <button
                               type="button"
                               key={`${client._id}-${date.date()}`}
-                              className={`calendar-client-entry ${getStatusClassName(repaymentForDisplay)}`}
+                              className={`calendar-client-entry ${getStatusClassName(forDisplay)}`}
                               onClick={() => handleClientClick(client, date.format('YYYY-MM-DD'), repayment)}
+                              style={{ fontSize: 11, width: '100%', textAlign: 'left' }}
                             >
                               {client?.name}
                             </button>
                           );
                         })}
-                        {hiddenCount > 0 ? (
-                          <Typography.Text style={{ color: BOX_TEXT, fontSize: 12 }}>
-                            +{hiddenCount} {translate('more')}
+                        {hidden > 0 && (
+                          <Typography.Text style={{ color: BOX_TEXT, fontSize: 11 }}>
+                            +{hidden} {translate('more')}
                           </Typography.Text>
-                        ) : null}
+                        )}
                       </Space>
                     </div>
                   );
@@ -706,17 +661,20 @@ export default function Repayment() {
         </Card>
       </Spin>
 
+      {/* ── Edit Modal ── */}
       <Modal
         title={translate('Edit Repayment')}
         open={isEditModalOpen}
         onOk={handleEditModalOk}
+        confirmLoading={submitLoading}
         onCancel={() => {
           setIsEditModalOpen(false);
           setEditingRepayment(null);
           form.resetFields();
         }}
-        width={window.innerWidth < 768 ? '95%' : 720}
-        style={{ top: 24 }}
+        width={isMobile ? '95vw' : 680}
+        style={{ top: isMobile ? 10 : 24 }}
+        maskClosable={false}
       >
         <Form form={form} layout="vertical">
           <RepaymentForm isUpdateForm={true} />

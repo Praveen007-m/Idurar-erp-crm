@@ -1,4 +1,8 @@
-import React from 'react';
+/**
+ * AppFooter.jsx — Webaac Solutions Finance Management
+ * Global footer shown on all pages.
+ * Import and use inside ErpLayout and DashboardLayout.
+ */
 import { Layout, Typography, Grid } from 'antd';
 
 const { Footer } = Layout;
@@ -7,7 +11,7 @@ const { useBreakpoint } = Grid;
 const BRAND = '#28a7ab';
 const year  = new Date().getFullYear();
 
-const FooterContent = () => {
+export default function AppFooter() {
   const screens  = useBreakpoint();
   const isMobile = !screens.md;
 
@@ -17,8 +21,8 @@ const FooterContent = () => {
         textAlign:   'center',
         background:  'transparent',
         padding:     isMobile ? '14px 16px' : '16px 24px',
-        borderTop:   '1px solid #f0f0f0',
         marginTop:   'auto',
+        borderTop:   '1px solid #f0f0f0',
       }}
     >
       <Typography.Text
@@ -50,6 +54,4 @@ const FooterContent = () => {
       </Typography.Text>
     </Footer>
   );
-};
-
-export default FooterContent;
+}

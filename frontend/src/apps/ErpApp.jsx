@@ -8,80 +8,65 @@ import { Layout } from 'antd';
 import { useAppContext } from '@/context/appContext';
 
 import Navigation from '@/apps/Navigation/NavigationContainer';
-
 import HeaderContent from '@/apps/Header/HeaderContainer';
 import PageLoader from '@/components/PageLoader';
 
 import { settingsAction } from '@/redux/settings/actions';
-
 import { selectSettings } from '@/redux/settings/selectors';
 
 import AppRouter from '@/router/AppRouter';
-
 import useResponsive from '@/hooks/useResponsive';
-
-import storePersist from '@/redux/storePersist';
+import FooterContent from '@/layout/Footer';
 
 export default function ErpCrmApp() {
-  const { Content } = Layout;
-
-  // const { state: stateApp, appContextAction } = useAppContext();
-  // // const { app } = appContextAction;
-  // const { isNavMenuClose, currentApp } = stateApp;
-
+  const { Content, Footer } = Layout;
   const { isMobile } = useResponsive();
-
   const dispatch = useDispatch();
 
   useLayoutEffect(() => {
     dispatch(settingsAction.list({ entity: 'setting' }));
   }, []);
 
-  // const appSettings = useSelector(selectAppSettings);
-
   const { isSuccess: settingIsloaded } = useSelector(selectSettings);
-
-  // useEffect(() => {
-  //   const { loadDefaultLang } = storePersist.get('firstVisit');
-  //   if (appSettings.idurar_app_language && !loadDefaultLang) {
-  //     window.localStorage.setItem('firstVisit', JSON.stringify({ loadDefaultLang: true }));
-  //   }
-  // }, [appSettings]);
 
   if (settingIsloaded)
     return (
-      <Layout hasSider>
+      <Layout hasSider style={{ minHeight: '100vh' }}>
         <Navigation />
 
         {isMobile ? (
-          <Layout style={{ marginLeft: 0 }}>
+          <Layout style={{ marginLeft: 0, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <HeaderContent />
             <Content
               style={{
-                margin: '60px auto 30px',
+                margin:   '60px auto 0',
                 overflow: 'initial',
-                width: '100%',
-                padding: '0 12px',
+                width:    '100%',
+                padding:  '0 12px',
                 maxWidth: 'none',
+                flex:     1,
               }}
             >
               <AppRouter />
             </Content>
+            <FooterContent />
           </Layout>
         ) : (
-          <Layout>
+          <Layout style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <HeaderContent />
             <Content
               style={{
-                margin: '40px auto 30px',
+                margin:   '40px auto 0',
                 overflow: 'initial',
-                width: '100%',
-                padding: '0 50px',
+                width:    '100%',
+                padding:  '0 50px',
                 maxWidth: 1400,
+                flex:     1,
               }}
             >
               <AppRouter />
             </Content>
+            <FooterContent />
           </Layout>
         )}
       </Layout>

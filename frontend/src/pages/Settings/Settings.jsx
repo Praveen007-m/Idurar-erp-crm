@@ -1,59 +1,95 @@
+/**
+ * pages/settings/Settings.jsx — Webaac Solutions Finance Management
+ *
+ * Mobile fixes:
+ *  - tabPosition: top (not left) on mobile — left tabs break on small screens
+ *  - Each settings card is full-width on mobile
+ *  - Padding adjusted
+ *
+ * NOTE: Imports your existing sub-components from the Settings folder.
+ * Adjust the import paths if your folder structure differs.
+ */
+import { Grid, Tabs, Typography } from 'antd';
 import {
+  BankOutlined,
   SettingOutlined,
-  CreditCardOutlined,
   DollarOutlined,
-  FileImageOutlined,
-  TrophyOutlined,
+  GlobalOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
-
-import TabsContent from '@/components/TabsContent/TabsContent';
-
+import { ErpLayout } from '@/layout';
+import CompanySettings    from './CompanySettings';
 import CompanyLogoSettings from './CompanyLogoSettings';
-import GeneralSettings from './GeneralSettings';
-import CompanySettings from './CompanySettings';
-import FinanceSettings from './FinanceSettings';
+import FinanceSettings    from './FinanceSettings';
+import GeneralSettings    from './GeneralSettings';
 import MoneyFormatSettings from './MoneyFormatSettings';
 
-import useLanguage from '@/locale/useLanguage';
-import { useParams } from 'react-router-dom';
+const { useBreakpoint } = Grid;
+
+const TAB_ITEMS = [
+  {
+    key:      'company',
+    label:    <span><BankOutlined /> Company</span>,
+    children: <CompanySettings />,
+  },
+  {
+    key:      'logo',
+    label:    <span><PictureOutlined /> Logo</span>,
+    children: <CompanyLogoSettings />,
+  },
+  {
+    key:      'finance',
+    label:    <span><DollarOutlined /> Finance</span>,
+    children: <FinanceSettings />,
+  },
+  {
+    key:      'general',
+    label:    <span><SettingOutlined /> General</span>,
+    children: <GeneralSettings />,
+  },
+  {
+    key:      'money',
+    label:    <span><GlobalOutlined /> Money Format</span>,
+    children: <MoneyFormatSettings />,
+  },
+];
 
 export default function Settings() {
-  const translate = useLanguage();
-  const { settingsKey } = useParams();
-  const content = [
-    {
-      key: 'general_settings',
-      label: translate('General Settings'),
-      icon: <SettingOutlined />,
-      children: <GeneralSettings />,
-    },
-    {
-      key: 'company_settings',
-      label: translate('Company Settings'),
-      icon: <TrophyOutlined />,
-      children: <CompanySettings />,
-    },
-    {
-      key: 'company_logo',
-      label: translate('Company Logo'),
-      icon: <FileImageOutlined />,
-      children: <CompanyLogoSettings />,
-    },
-    {
-      key: 'currency_settings',
-      label: translate('Currency Settings'),
-      icon: <DollarOutlined />,
-      children: <MoneyFormatSettings />,
-    },
-    {
-      key: 'finance_settings',
-      label: translate('Finance Settings'),
-      icon: <CreditCardOutlined />,
-      children: <FinanceSettings />,
-    },
-  ];
+  const screens  = useBreakpoint();
+  const isMobile = !screens.md;
 
-  const pageTitle = translate('Settings');
+  return (
+    <ErpLayout>
+      <div
+        style={{
+          padding:    isMobile ? '12px 8px' : '24px',
+          background: '#fff',
+          minHeight:  '100%',
+        }}
+      >
+        <Typography.Title
+          level={isMobile ? 4 : 3}
+          style={{ marginBottom: isMobile ? 12 : 20, marginTop: 0 }}
+        >
+          <SettingOutlined style={{ marginRight: 8, color: '#28a7ab' }} />
+          Settings
+        </Typography.Title>
 
-  return <TabsContent defaultActiveKey={settingsKey} content={content} pageTitle={pageTitle} />;
+        <Tabs
+          defaultActiveKey="company"
+          tabPosition={isMobile ? 'top' : 'left'}
+          size={isMobile ? 'small' : 'middle'}
+          items={TAB_ITEMS}
+          style={{
+            background: '#fff',
+          }}
+          tabBarStyle={
+            isMobile
+              ? { marginBottom: 16, overflowX: 'auto' }
+              : { minWidth: 160 }
+          }
+        />
+      </div>
+    </ErpLayout>
+  );
 }

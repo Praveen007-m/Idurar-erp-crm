@@ -9,6 +9,11 @@ const { routesList } = require('@/models/utils');
 const adminController = require('@/controllers/appControllers/adminController');
 const checkRole = require('@/middlewares/checkRole');
 
+// ── Models for staff performance aggregation ──────────────────────────────────
+const Client    = require('@/models/appModels/Client');
+const Admin     = require('@/models/coreModels/Admin');
+const Repayment = require('@/models/appModels/Repayment');
+
 // =============================
 // ADMIN / STAFF ROUTES
 // =============================
@@ -34,6 +39,143 @@ router.route('/admin/listAllStaff')
   .get(checkRole(['admin', 'owner']), catchErrors(adminController.listAllStaff));
 
 // =============================
+// STAFF PERFORMANCE ROUTE
+// =============================
+
+router.route('/staff/performance')
+  .get(checkRole(['admin', 'owner']), catchErrors(async (req, res) => {
+    // 1. Get all staff members
+    const staffList = await Admin.find({ role: "staff", $or: [{ removed: false }, { removed: { $exists: false } }] }).lean();
+
+    if (!staffList.length) {
+      return res.json({
+        success: true,
+        result: { staffWise: [], activeCount: 0, topPerformer: null },
+      });
+    }
+
+    const staffIds   = staffList.map((s) => s._id);
+    const now        = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // 2. Aggregate clients per staff (uses Client.assigned field)
+    const clientAgg = await Client.aggregate([
+      { $match: safeMatch({ assigned: { $in: staffIds } }) },
+      {
+        $group: {
+          _id:           '$assigned',
+          customerCount: { $sum: 1 },
+          activeCount:   { $sum: { $cond: [{ $eq: ['$status', 'active'] },    1, 0] } },
+          defaultCount:  { $sum: { $cond: [{ $eq: ['$status', 'defaulted'] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    const clientMap = {};
+    clientAgg.forEach((row) => { clientMap[row._id.toString()] = row; });
+
+    // 3. Aggregate repayments per staff via Client.assigned
+    const repaymentAgg = await Repayment.aggregate([
+      {
+        $lookup: {
+          from:         'clients',
+          localField:   'client',
+          foreignField: '_id',
+          as:           'clientDoc',
+        },
+      },
+      { $unwind: '$clientDoc' },
+      { $match: { 'clientDoc.assigned': { $in: staffIds } } },
+      {
+        $group: {
+          _id: '$clientDoc.assigned',
+          totalCollected: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] },
+                { $ifNull: ['$amountPaid', 0] },
+                0,
+              ],
+            },
+          },
+          monthCollected: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] },
+                    { $gte: ['$paymentDate', monthStart] },
+                    { $lte: ['$paymentDate', monthEnd] },
+                  ],
+                },
+                { $ifNull: ['$amountPaid', 0] },
+                0,
+              ],
+            },
+          },
+          totalPending: {
+            $sum: {
+              $cond: [
+                { $not: { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] } },
+                { $ifNull: ['$balance', 0] },
+                0,
+              ],
+            },
+          },
+          overdueCount: {
+            $sum: { $cond: [{ $in: ['$status', ['default', 'DEFAULT']] }, 1, 0] },
+          },
+          totalRepayments: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const repaymentMap = {};
+    repaymentAgg.forEach((row) => { repaymentMap[row._id.toString()] = row; });
+
+    // 4. Merge into final result
+    const staffWise = staffList.map((staff) => {
+      const sid     = staff._id.toString();
+      const clients = clientMap[sid]    || {};
+      const reps    = repaymentMap[sid] || {};
+
+      const totalCollected = reps.totalCollected || 0;
+      const totalPending   = reps.totalPending   || 0;
+      const efficiency     = totalCollected + totalPending > 0
+        ? Math.round((totalCollected / (totalCollected + totalPending)) * 100)
+        : 0;
+
+      return {
+        _id:             staff._id,
+        name:            staff.name,
+        email:           staff.email,
+        phone:           staff.phone,
+        customerCount:   clients.customerCount  || 0,
+        activeCount:     clients.activeCount    || 0,
+        defaultCount:    clients.defaultCount   || 0,
+        totalCollected,
+        monthCollected:  reps.monthCollected    || 0,
+        totalPending,
+        overdueCount:    reps.overdueCount      || 0,
+        totalRepayments: reps.totalRepayments   || 0,
+        efficiency,
+      };
+    });
+
+    staffWise.sort((a, b) => b.totalCollected - a.totalCollected);
+
+    return res.json({
+      success: true,
+      result: {
+        staffWise,
+        activeCount:  staffWise.filter((s) => s.customerCount > 0).length,
+        topPerformer: staffWise[0]?.name || null,
+      },
+    });
+  }));
+
+// =============================
 // DASHBOARD ROUTES
 // =============================
 const dashboardController = require('@/controllers/appControllers/dashboardController');
@@ -46,8 +188,6 @@ router.route('/dashboard/staff')
 
 router.route('/reports')
   .get(checkRole(['admin', 'owner', 'staff']), catchErrors(dashboardController.reports));
-
-
 
 // =============================
 // GENERIC ENTITY ROUTES
@@ -82,19 +222,16 @@ const routerApp = (entity, controller) => {
   router.route(`/${entity}/summary`)
     .get(catchErrors(controller['summary']));
 
-  // Invoice / Quote / Payment email
   if (entity === 'invoice' || entity === 'quote' || entity === 'payment') {
     router.route(`/${entity}/mail`)
       .post(catchErrors(controller['mail']));
   }
 
-  // Quote convert
   if (entity === 'quote') {
     router.route(`/${entity}/convert/:id`)
       .get(catchErrors(controller['convert']));
   }
 
-  // Repayment: Add dedicated client-specific endpoint for calendar
   if (entity === 'repayment') {
     router.route(`/${entity}/by-client-date`)
       .get(catchErrors(controller['getByClientAndDate']));
@@ -119,7 +256,6 @@ router
 router
   .route('/payment-mode/:id')
   .put(catchErrors(appControllers.paymentModeController.update));
-
 
 // =============================
 // AUTO REGISTER ENTITY ROUTES
