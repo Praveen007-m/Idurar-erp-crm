@@ -132,6 +132,7 @@ export default function Repayment() {
   const [statusFilter, setStatusFilter]       = useState('all');
   const [repayments, setRepayments]           = useState([]);
   const [submitLoading, setSubmitLoading]     = useState(false);
+  const [expandedDays, setExpandedDays]       = useState(new Set());
 
   const loadClients = useCallback(() => {
     dispatch(crud.list({ entity: 'client', options: { page: 1, items: 100 } }));
@@ -530,15 +531,19 @@ export default function Repayment() {
               </>
             ) : (
               <Calendar fullscreen value={currentDate}
-                onPanelChange={(v) => setCurrentDate(v)}
+                onPanelChange={(v) => { setCurrentDate(v); setExpandedDays(new Set()); }}
                 onChange={(v) => setCurrentDate(v)}
                 fullCellRender={(date) => {
                   if (!date.isSame(currentDate, 'month')) {
                     return <div style={{ minHeight: 110, padding: 6, background: '#fafafa' }} />;
                   }
+                  const dayKey     = date.format('YYYY-MM-DD');
                   const dayClients = clientsByDay[date.date()] || [];
-                  const visible    = dayClients.slice(0, 2);
-                  const hidden     = Math.max(dayClients.length - visible.length, 0);
+                  const isExpanded = expandedDays.has(dayKey);
+                  const PREVIEW    = 2;
+                  const visible    = isExpanded ? dayClients : dayClients.slice(0, PREVIEW);
+                  const hidden     = Math.max(dayClients.length - PREVIEW, 0);
+
                   return (
                     <div className="calendar-cell" style={{
                       minHeight: 110, padding: 6, borderRadius: 8,
@@ -560,16 +565,55 @@ export default function Repayment() {
                             <button type="button"
                               key={`${client._id}-${date.date()}`}
                               className={`calendar-client-entry ${getStatusClassName(forDisplay)}`}
-                              onClick={() => handleClientClick(client, date.format('YYYY-MM-DD'), repayment)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClientClick(client, date.format('YYYY-MM-DD'), repayment);
+                              }}
                               style={{ fontSize: 11, width: '100%', textAlign: 'left' }}>
                               {client?.name}
                             </button>
                           );
                         })}
-                        {hidden > 0 && (
-                          <Typography.Text style={{ color: BOX_TEXT, fontSize: 11 }}>
-                            +{hidden} {translate('more')}
-                          </Typography.Text>
+                        {/* Show more / show less toggle */}
+                        {hidden > 0 && !isExpanded && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedDays((prev) => {
+                                const next = new Set(prev);
+                                next.add(dayKey);
+                                return next;
+                              });
+                            }}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: BOX_TEXT, fontSize: 11, padding: '2px 0',
+                              textAlign: 'left', width: '100%', fontWeight: 600,
+                            }}
+                          >
+                            +{hidden} more ▾
+                          </button>
+                        )}
+                        {isExpanded && dayClients.length > PREVIEW && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedDays((prev) => {
+                                const next = new Set(prev);
+                                next.delete(dayKey);
+                                return next;
+                              });
+                            }}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: BOX_TEXT, fontSize: 11, padding: '2px 0',
+                              textAlign: 'left', width: '100%', fontWeight: 600,
+                            }}
+                          >
+                            ▴ show less
+                          </button>
                         )}
                       </Space>
                     </div>

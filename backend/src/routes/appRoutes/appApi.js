@@ -187,7 +187,7 @@ router.route('/staff/performance')
 // =============================
 // DASHBOARD ROUTES
 // =============================
-const dashboardController = require('@/controllers/appControllers/dashboardController');
+const dashboardController = require('@/controllers/appControllers/dashboardController/index');
 
 router.route('/dashboard/admin')
   .get(catchErrors(dashboardController.adminDashboard));

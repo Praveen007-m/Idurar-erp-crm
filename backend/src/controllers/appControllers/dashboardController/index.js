@@ -39,8 +39,8 @@ const endOfMonth = () => {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 };
 
-// Handles docs where removed is false OR missing
-const notRemoved = { $or: [{ removed: false }, { removed: { $exists: false } }] };
+// Handles docs where removed is false OR missing OR not true
+const notRemoved = { removed: { $ne: true } };
 
 // Statuses that mean fully paid (lowercase + uppercase variants for safety)
 const PAID_STATUSES    = ['paid', 'late', 'PAID', 'LATE'];
@@ -138,7 +138,7 @@ const adminDashboard = async (req, res) => {
    ════════════════════════════════════════════════════════════════════════════ */
 const staffDashboard = async (req, res) => {
   try {
-    const staffId    = req.admin._id;
+    const staffId    = req.admin?._id || req.admin?.id || req.adminId;
     const monthStart = startOfMonth();
     const monthEnd   = endOfMonth();
     const today      = startOfToday();
@@ -285,7 +285,7 @@ const reports = async (req, res) => {
       { $match: { ...notRemoved } },
       {
         $group: {
-          _id:   '$status',
+          _id:   { $toLower: '$status' }, 
           count: { $sum: 1 },
           total: { $sum: '$amount'    },
           paid:  { $sum: '$amountPaid' },
@@ -311,7 +311,7 @@ const reports = async (req, res) => {
           from: 'clients', localField: 'client', foreignField: '_id', as: 'clientDoc',
         },
       },
-      { $unwind: { path: '$clientDoc', preserveNullAndEmpty: true } },
+      { $unwind: { path: '$clientDoc', preserveNullAndEmptyArrays: true } },
       {
         $group: {
           _id:       { $ifNull: ['$clientDoc.repaymentType', 'Unknown'] },
@@ -356,7 +356,7 @@ const reports = async (req, res) => {
    ════════════════════════════════════════════════════════════════════════════ */
 const performanceSummary = async (req, res) => {
   try {
-    const staffId    = req.admin._id;
+    const staffId    = req.admin?._id || req.admin?.id || req.adminId;
     const monthStart = startOfMonth();
     const monthEnd   = endOfMonth();
     const today      = startOfToday();
