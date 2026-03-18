@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Row, Col, Card, Table, Spin, Alert,
-  Divider, Statistic, Typography, Grid,
+  Divider, Statistic, Typography, Grid, Space,
 } from 'antd';
 import {
   PieChartOutlined,
@@ -19,10 +19,10 @@ import { DashboardLayout } from '@/layout';
 const { useBreakpoint } = Grid;
 
 export default function Reports() {
-  const translate        = useLanguage();
+  const translate          = useLanguage();
   const { moneyFormatter } = useMoney();
-  const screens          = useBreakpoint();
-  const isMobile         = !screens.md;
+  const screens            = useBreakpoint();
+  const isMobile           = !screens.md;
 
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +34,10 @@ export default function Reports() {
     if (dashboardData || error) setLoading(false);
   }, [dashboardData, error]);
 
-  const data = dashboardData?.result || {};
+  // ── API shape: { success, result: { collections, statusBreakdown, planWise } }
+  // useFetch returns the full response as `result`, so dashboardData = { success, result }
+  // We need dashboardData?.result to get the inner result object
+  const data = dashboardData?.result ?? dashboardData ?? {};
 
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '60px auto' }} />;
   if (error)   return <Alert message="Error loading reports" type="error" showIcon style={{ margin: 24 }} />;
@@ -45,7 +48,7 @@ export default function Reports() {
       title:     translate('Status'),
       dataIndex: 'status',
       key:       'status',
-      render:    (v) => <span style={{ textTransform: 'capitalize' }}>{v}</span>,
+      render:    (v) => <span style={{ textTransform: 'capitalize' }}>{v?.replace(/_/g, ' ')}</span>,
     },
     {
       title:     translate('Count'),
@@ -65,15 +68,29 @@ export default function Reports() {
   const planColumns = [
     {
       title:     translate('Plan Group'),
-      dataIndex: 'plan',
-      key:       'plan',
-      render:    (_, _r, i) => `Plan Group ${i + 1}`,
+      dataIndex: 'planGroup',
+      key:       'planGroup',
+      render:    (v) => v || 'Unknown',
     },
     {
       title:     translate('Customers'),
-      dataIndex: 'customerCount',
-      key:       'customerCount',
+      dataIndex: 'customers',
+      key:       'customers',
       align:     'right',
+    },
+    {
+      title:     translate('Collected'),
+      dataIndex: 'collected',
+      key:       'collected',
+      align:     'right',
+      render:    (v) => moneyFormatter({ amount: v ?? 0 }),
+    },
+    {
+      title:     translate('Pending'),
+      dataIndex: 'pending',
+      key:       'pending',
+      align:     'right',
+      render:    (v) => moneyFormatter({ amount: v ?? 0 }),
     },
   ];
 
@@ -81,30 +98,26 @@ export default function Reports() {
   const statCards = [
     {
       title:      translate('Total Collected'),
-      value:      data.collections?.totalCollected || 0,
+      value:      data.collections?.totalCollected ?? 0,
       icon:       <DollarCircleOutlined style={{ color: '#52c41a' }} />,
-      color:      '#52c41a',
       valueStyle: { color: '#52c41a', fontSize: isMobile ? 20 : 24 },
     },
     {
       title:      translate('Pending Balance'),
-      value:      data.collections?.totalPending || 0,
+      value:      data.collections?.totalPending ?? 0,
       icon:       <FallOutlined style={{ color: '#ff4d4f' }} />,
-      color:      '#ff4d4f',
       valueStyle: { color: '#ff4d4f', fontSize: isMobile ? 20 : 24 },
     },
     {
       title:      translate('Month Collected'),
-      value:      data.collections?.monthCollected || 0,
+      value:      data.collections?.monthCollected ?? 0,
       icon:       <RiseOutlined style={{ color: '#1890ff' }} />,
-      color:      '#1890ff',
       valueStyle: { color: '#1890ff', fontSize: isMobile ? 20 : 24 },
     },
     {
       title:      translate('Month Pending'),
-      value:      data.collections?.monthPending || 0,
+      value:      data.collections?.monthPending ?? 0,
       icon:       <LineChartOutlined style={{ color: '#faad14' }} />,
-      color:      '#faad14',
       valueStyle: { color: '#faad14', fontSize: isMobile ? 20 : 24 },
     },
   ];
@@ -167,7 +180,7 @@ export default function Reports() {
               style={{ borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
             >
               <Table
-                dataSource={data.statusBreakdown || []}
+                dataSource={data.statusBreakdown ?? []}
                 columns={statusColumns}
                 pagination={false}
                 rowKey="status"
@@ -189,7 +202,7 @@ export default function Reports() {
               style={{ borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
             >
               <Table
-                dataSource={data.planWise || []}
+                dataSource={data.planWise ?? []}
                 columns={planColumns}
                 pagination={false}
                 rowKey={(_, i) => String(i)}
@@ -203,6 +216,3 @@ export default function Reports() {
     </DashboardLayout>
   );
 }
-
-// Needed for the Space import used above
-import { Space } from 'antd';

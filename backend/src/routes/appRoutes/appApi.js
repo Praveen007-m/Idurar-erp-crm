@@ -198,6 +198,9 @@ router.route('/dashboard/staff')
 router.route('/reports')
   .get(checkRole(['admin', 'owner', 'staff']), catchErrors(dashboardController.reports));
 
+router.route('/dashboard/performance-summary')
+  .get(catchErrors(dashboardController.performanceSummary));
+
 // =============================
 // GENERIC ENTITY ROUTES
 // =============================

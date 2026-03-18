@@ -1,11 +1,7 @@
 /**
- * pages/performance-summary/index.jsx — Webaac Solutions Finance Management
- * Staff "My Performance" page
- *
- * Mobile fixes:
- *  - span={8/12} → xs={24} sm={8/12} responsive cols
- *  - Progress dashboard size reduced on mobile
- *  - Card padding reduced on mobile
+ * pages/PerformanceSummary/index.jsx — Webaac Solutions Finance Management
+ * API: GET /api/dashboard/staff
+ * Response: { success, result: { customerMetrics, collections, installments, performance } }
  */
 import { useEffect, useState } from 'react';
 import {
@@ -33,10 +29,10 @@ const effLabel = (e, translate) =>
   : translate('Needs Improvement');
 
 export default function PerformanceSummary() {
-  const translate        = useLanguage();
+  const translate          = useLanguage();
   const { moneyFormatter } = useMoney();
-  const screens          = useBreakpoint();
-  const isMobile         = !screens.md;
+  const screens            = useBreakpoint();
+  const isMobile           = !screens.md;
   const [loading, setLoading] = useState(true);
 
   const { result: dashboardData, error } = useFetch(() =>
@@ -61,55 +57,58 @@ export default function PerformanceSummary() {
     </DashboardLayout>
   );
 
-  const data       = dashboardData?.result || {};
-  const efficiency = data.performance?.efficiency || 0;
+  // ── Fix: useFetch returns full API response as `result`
+  // dashboardData = { success, result: { customerMetrics, collections, ... } }
+  // so we need dashboardData?.result to get the inner data
+  const data       = dashboardData?.result ?? dashboardData ?? {};
+  const efficiency = data.performance?.efficiency ?? 0;
 
   const collectionCards = [
     {
-      title:      translate('Total Collected'),
-      value:      data.collections?.totalCollected || 0,
-      icon:       <DollarCircleOutlined style={{ color: '#52c41a' }} />,
-      color:      '#52c41a',
-      bg:         '#f6ffed',
+      title: translate('Total Collected'),
+      value: data.collections?.totalCollected ?? 0,
+      icon:  <DollarCircleOutlined style={{ color: '#52c41a' }} />,
+      color: '#52c41a',
+      bg:    '#f6ffed',
     },
     {
-      title:      translate('Pending Amount'),
-      value:      data.collections?.totalPending || 0,
-      icon:       <SyncOutlined style={{ color: '#faad14' }} />,
-      color:      '#faad14',
-      bg:         '#fffbe6',
+      title: translate('Pending Amount'),
+      value: data.collections?.totalPending ?? 0,
+      icon:  <SyncOutlined style={{ color: '#faad14' }} />,
+      color: '#faad14',
+      bg:    '#fffbe6',
     },
     {
-      title:      translate('This Month Collected'),
-      value:      data.collections?.monthCollected || 0,
-      icon:       <CheckCircleOutlined style={{ color: BRAND }} />,
-      color:      BRAND,
-      bg:         '#f0fafa',
+      title: translate('This Month Collected'),
+      value: data.collections?.monthCollected ?? 0,
+      icon:  <CheckCircleOutlined style={{ color: BRAND }} />,
+      color: BRAND,
+      bg:    '#f0fafa',
     },
   ];
 
   const breakdownItems = [
     {
       title: translate('Active Customers'),
-      value: data.customerMetrics?.active    || 0,
+      value: data.customerMetrics?.active    ?? 0,
       color: '#1890ff',
       icon:  <UserOutlined />,
     },
     {
       title: translate('Fully Paid Customers'),
-      value: data.customerMetrics?.completed || 0,
+      value: data.customerMetrics?.completed ?? 0,
       color: '#52c41a',
       icon:  <CheckCircleOutlined />,
     },
     {
       title: translate('Defaulted Accounts'),
-      value: data.customerMetrics?.defaulted || 0,
+      value: data.customerMetrics?.defaulted ?? 0,
       color: '#cf1322',
       icon:  <WarningOutlined />,
     },
     {
       title: translate('Upcoming Installments'),
-      value: data.installments?.upcoming     || 0,
+      value: data.installments?.upcoming     ?? 0,
       color: '#595959',
       icon:  <CalendarOutlined />,
     },
@@ -119,7 +118,6 @@ export default function PerformanceSummary() {
     <DashboardLayout>
       <div style={{ padding: isMobile ? '12px 10px' : '24px' }}>
 
-        {/* Title */}
         <Typography.Title
           level={isMobile ? 4 : 3}
           style={{ marginBottom: isMobile ? 14 : 24, marginTop: 0 }}
@@ -133,19 +131,11 @@ export default function PerformanceSummary() {
             <Col xs={24} sm={8} key={card.title}>
               <Card
                 bordered={false}
-                style={{
-                  borderRadius: 10,
-                  background:   card.bg,
-                  boxShadow:    '0 1px 4px rgba(0,0,0,0.06)',
-                }}
+                style={{ borderRadius: 10, background: card.bg, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
                 styles={{ body: { padding: isMobile ? '14px 16px' : '20px' } }}
               >
                 <Statistic
-                  title={
-                    <span style={{ fontSize: isMobile ? 12 : 14, color: '#8c8c8c' }}>
-                      {card.title}
-                    </span>
-                  }
+                  title={<span style={{ fontSize: isMobile ? 12 : 14, color: '#8c8c8c' }}>{card.title}</span>}
                   value={card.value}
                   prefix={card.icon}
                   formatter={moneyFormatter}
@@ -160,15 +150,9 @@ export default function PerformanceSummary() {
 
         {/* Efficiency + Breakdown */}
         <Row gutter={[10, 10]}>
-          {/* Efficiency */}
           <Col xs={24} md={12}>
             <Card
-              title={
-                <Space>
-                  <BarChartOutlined style={{ color: BRAND }} />
-                  <span>{translate('Overall Efficiency')}</span>
-                </Space>
-              }
+              title={<Space><BarChartOutlined style={{ color: BRAND }} /><span>{translate('Overall Efficiency')}</span></Space>}
               bordered={false}
               style={{ borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', height: '100%' }}
               styles={{ body: { padding: isMobile ? '16px' : '24px' } }}
@@ -194,7 +178,6 @@ export default function PerformanceSummary() {
             </Card>
           </Col>
 
-          {/* Account breakdown */}
           <Col xs={24} md={12}>
             <Card
               title={translate('Account Actions Breakdown')}
@@ -206,8 +189,7 @@ export default function PerformanceSummary() {
                 {breakdownItems.map((item) => (
                   <Col xs={12} key={item.title}>
                     <Card
-                      size="small"
-                      bordered={false}
+                      size="small" bordered={false}
                       style={{
                         background:   `${item.color}0f`,
                         borderRadius: 8,
@@ -215,9 +197,7 @@ export default function PerformanceSummary() {
                       }}
                       styles={{ body: { padding: '12px' } }}
                     >
-                      <div style={{ color: '#8c8c8c', fontSize: 11, marginBottom: 4 }}>
-                        {item.title}
-                      </div>
+                      <div style={{ color: '#8c8c8c', fontSize: 11, marginBottom: 4 }}>{item.title}</div>
                       <div style={{ fontWeight: 700, fontSize: isMobile ? 20 : 24, color: item.color }}>
                         {item.value}
                       </div>
