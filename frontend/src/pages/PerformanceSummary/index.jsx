@@ -1,7 +1,6 @@
 /**
  * pages/PerformanceSummary/index.jsx — Webaac Solutions Finance Management
- * API: GET /api/dashboard/staff
- * Response: { success, result: { customerMetrics, collections, installments, performance } }
+ * API: GET /api/dashboard/performance-summary
  */
 import { useEffect, useState } from 'react';
 import {
@@ -13,10 +12,12 @@ import {
   CheckCircleOutlined, SyncOutlined,
   UserOutlined, WarningOutlined, CalendarOutlined,
 } from '@ant-design/icons';
+import { useSelector } from 'react-redux';
 import { request } from '@/request';
 import useFetch from '@/hooks/useFetch';
 import useLanguage from '@/locale/useLanguage';
 import { useMoney } from '@/settings';
+import { selectMoneyFormat } from '@/redux/settings/selectors';
 import { DashboardLayout } from '@/layout';
 
 const { useBreakpoint } = Grid;
@@ -31,17 +32,32 @@ const effLabel = (e, translate) =>
 export default function PerformanceSummary() {
   const translate          = useLanguage();
   const { moneyFormatter } = useMoney();
+  const moneySettings      = useSelector(selectMoneyFormat);
   const screens            = useBreakpoint();
   const isMobile           = !screens.md;
   const [loading, setLoading] = useState(true);
 
+  // useFetch internally does: setData(apiResponse.result)
+  // So dashboardData IS already the inner result object — never add .result again
   const { result: dashboardData, error } = useFetch(() =>
-    request.get({ entity: 'dashboard/staff' })
+    request.get({ entity: 'dashboard/performance-summary' })
   );
 
   useEffect(() => {
     if (dashboardData || error) setLoading(false);
   }, [dashboardData, error]);
+
+  // FIX 1: currency_code — cover every Redux key shape, fallback to 'INR'
+  const currencyCode =
+    moneySettings?.default_currency_code ||
+    moneySettings?.currency_code         ||
+    moneySettings?.currencyCode          ||
+    'INR';
+
+  // FIX 2: wrap moneyFormatter so Antd Statistic's formatter(value) call
+  // is converted to moneyFormatter({ amount, currency_code }) correctly
+  const formatMoney = (value) =>
+    moneyFormatter({ amount: Number(value ?? 0), currency_code: currencyCode });
 
   if (loading) return (
     <DashboardLayout>
@@ -57,30 +73,40 @@ export default function PerformanceSummary() {
     </DashboardLayout>
   );
 
-  // ── Fix: useFetch returns full API response as `result`
-  // dashboardData = { success, result: { customerMetrics, collections, ... } }
-  // so we need dashboardData?.result to get the inner data
-  const data       = dashboardData?.result ?? dashboardData ?? {};
-  const efficiency = data.performance?.efficiency ?? 0;
+  // FIX 3: dashboardData IS already the result object (useFetch unwraps the envelope).
+  // Read flat fields first, nested paths as fallback, 0 as last resort.
+  const safeData   = dashboardData ?? {};
+  const efficiency = safeData.performance?.efficiency ?? safeData.efficiency ?? 0;
+
+  // Monetary values — flat path first, nested collections path as fallback
+  const totalCollected = safeData.totalCollected  ?? safeData.collections?.totalCollected ?? 0;
+  const totalPending   = safeData.pendingAmount   ?? safeData.collections?.totalPending   ?? 0;
+  const monthCollected = safeData.monthCollected  ?? safeData.collections?.monthCollected  ?? 0;
+
+  // Customer metrics — flat path first, nested customerMetrics as fallback
+  const activeCustomers = safeData.activeCustomers ?? safeData.customerMetrics?.active    ?? 0;
+  const fullyPaid       = safeData.fullyPaid       ?? safeData.customerMetrics?.completed ?? 0;
+  const defaultedCount  = safeData.defaultedCount  ?? safeData.customerMetrics?.defaulted ?? 0;
+  const upcomingCount   = safeData.upcomingCount   ?? safeData.installments?.upcoming     ?? 0;
 
   const collectionCards = [
     {
       title: translate('Total Collected'),
-      value: data.collections?.totalCollected ?? 0,
+      value: totalCollected,
       icon:  <DollarCircleOutlined style={{ color: '#52c41a' }} />,
       color: '#52c41a',
       bg:    '#f6ffed',
     },
     {
       title: translate('Pending Amount'),
-      value: data.collections?.totalPending ?? 0,
+      value: totalPending,
       icon:  <SyncOutlined style={{ color: '#faad14' }} />,
       color: '#faad14',
       bg:    '#fffbe6',
     },
     {
       title: translate('This Month Collected'),
-      value: data.collections?.monthCollected ?? 0,
+      value: monthCollected,
       icon:  <CheckCircleOutlined style={{ color: BRAND }} />,
       color: BRAND,
       bg:    '#f0fafa',
@@ -90,25 +116,25 @@ export default function PerformanceSummary() {
   const breakdownItems = [
     {
       title: translate('Active Customers'),
-      value: data.customerMetrics?.active    ?? 0,
+      value: activeCustomers,
       color: '#1890ff',
       icon:  <UserOutlined />,
     },
     {
       title: translate('Fully Paid Customers'),
-      value: data.customerMetrics?.completed ?? 0,
+      value: fullyPaid,
       color: '#52c41a',
       icon:  <CheckCircleOutlined />,
     },
     {
       title: translate('Defaulted Accounts'),
-      value: data.customerMetrics?.defaulted ?? 0,
+      value: defaultedCount,
       color: '#cf1322',
       icon:  <WarningOutlined />,
     },
     {
       title: translate('Upcoming Installments'),
-      value: data.installments?.upcoming     ?? 0,
+      value: upcomingCount,
       color: '#595959',
       icon:  <CalendarOutlined />,
     },
@@ -138,7 +164,7 @@ export default function PerformanceSummary() {
                   title={<span style={{ fontSize: isMobile ? 12 : 14, color: '#8c8c8c' }}>{card.title}</span>}
                   value={card.value}
                   prefix={card.icon}
-                  formatter={moneyFormatter}
+                  formatter={formatMoney}
                   valueStyle={{ color: card.color, fontSize: isMobile ? 18 : 22 }}
                 />
               </Card>
@@ -152,7 +178,12 @@ export default function PerformanceSummary() {
         <Row gutter={[10, 10]}>
           <Col xs={24} md={12}>
             <Card
-              title={<Space><BarChartOutlined style={{ color: BRAND }} /><span>{translate('Overall Efficiency')}</span></Space>}
+              title={
+                <Space>
+                  <BarChartOutlined style={{ color: BRAND }} />
+                  <span>{translate('Overall Efficiency')}</span>
+                </Space>
+              }
               bordered={false}
               style={{ borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', height: '100%' }}
               styles={{ body: { padding: isMobile ? '16px' : '24px' } }}
@@ -160,7 +191,7 @@ export default function PerformanceSummary() {
               <div style={{ textAlign: 'center', padding: isMobile ? '8px 0' : '16px 0' }}>
                 <Progress
                   type="dashboard"
-                  percent={efficiency}
+                  percent={Math.min(efficiency, 100)}
                   strokeColor={effColor(efficiency)}
                   format={(p) => `${p}%`}
                   size={isMobile ? 140 : 180}
@@ -189,7 +220,8 @@ export default function PerformanceSummary() {
                 {breakdownItems.map((item) => (
                   <Col xs={12} key={item.title}>
                     <Card
-                      size="small" bordered={false}
+                      size="small"
+                      bordered={false}
                       style={{
                         background:   `${item.color}0f`,
                         borderRadius: 8,
@@ -208,6 +240,7 @@ export default function PerformanceSummary() {
             </Card>
           </Col>
         </Row>
+
       </div>
     </DashboardLayout>
   );

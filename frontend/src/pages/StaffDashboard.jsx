@@ -1,25 +1,22 @@
 /**
  * StaffDashboard.jsx — Webaac Solutions Finance Management
  * Place: frontend/src/pages/StaffDashboard.jsx
- *
- * API: GET /api/dashboard/staff
- * Response: { success, result: { customerMetrics, collections, installments, performance } }
- *
- * Uses same useFetch + request pattern as other pages in this project.
  */
 import { useEffect, useState } from 'react';
 import {
   Row, Col, Card, Spin, Alert, Statistic,
-  Progress, Typography, Grid, Table, Space,
+  Progress, Typography, Grid, Table,
 } from 'antd';
 import {
   TeamOutlined, DollarCircleOutlined,
   WarningOutlined, CalendarOutlined,
 } from '@ant-design/icons';
+import { useSelector } from 'react-redux';
 import { request } from '@/request';
 import useFetch from '@/hooks/useFetch';
 import useLanguage from '@/locale/useLanguage';
 import { useMoney } from '@/settings';
+import { selectMoneyFormat } from '@/redux/settings/selectors';
 import { DashboardLayout } from '@/layout';
 
 const { useBreakpoint } = Grid;
@@ -27,10 +24,13 @@ const { useBreakpoint } = Grid;
 export default function StaffDashboard() {
   const translate          = useLanguage();
   const { moneyFormatter } = useMoney();
+  const moneySettings      = useSelector(selectMoneyFormat);
   const screens            = useBreakpoint();
   const isMobile           = !screens.md;
   const [loading, setLoading] = useState(true);
 
+  // useFetch internally does: setData(apiResponse.result)
+  // So dashboardData = apiResponse.result = the flat object directly
   const { result: dashboardData, error } = useFetch(() =>
     request.get({ entity: 'dashboard/staff' })
   );
@@ -38,6 +38,18 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (dashboardData || error) setLoading(false);
   }, [dashboardData, error]);
+
+  // ── FIX 1: currency_code — try every possible Redux key, fallback to 'INR'
+  const currencyCode =
+    moneySettings?.default_currency_code ||
+    moneySettings?.currency_code         ||
+    moneySettings?.currencyCode          ||
+    'INR';
+
+  // ── FIX 2: wrap moneyFormatter so Antd Statistic's formatter(value) call
+  //    is converted to moneyFormatter({ amount, currency_code }) correctly
+  const formatMoney = (value) =>
+    moneyFormatter({ amount: Number(value ?? 0), currency_code: currencyCode });
 
   if (loading) return (
     <DashboardLayout>
@@ -53,13 +65,19 @@ export default function StaffDashboard() {
     </DashboardLayout>
   );
 
-  // useFetch returns full API response as `result`
-  // dashboardData = { success, result: { customerMetrics, collections, ... } }
-  const data       = dashboardData?.result ?? dashboardData ?? {};
-  const col        = data.collections      ?? {};
-  const cust       = data.customerMetrics  ?? {};
-  const inst       = data.installments     ?? {};
-  const efficiency = data.performance?.efficiency ?? 0;
+  // ── FIX 3: dashboardData IS already the result object (useFetch unwraps it).
+  //    Never add .result again — that gives undefined.
+  //    Read flat fields first, nested collections as fallback.
+  const safeData = dashboardData ?? {};
+
+  const totalCollected = safeData.totalCollected  ?? safeData.collections?.totalCollected ?? 0;
+  const totalPending   = safeData.pendingAmount   ?? safeData.collections?.totalPending   ?? 0;
+  const monthCollected = safeData.monthCollected  ?? safeData.collections?.monthCollected  ?? 0;
+  const overdueCount   = safeData.overdueCount    ?? safeData.installments?.overdue        ?? 0;
+  const upcomingCount  = safeData.upcomingCount   ?? safeData.installments?.upcoming       ?? 0;
+  const efficiency     = safeData.performance?.efficiency ?? 0;
+  const cust           = safeData.customerMetrics ?? {};
+  const totalAssigned  = cust.total ?? safeData.totalAssigned ?? 0;
 
   const summaryRows = [
     { key: '1', metric: translate('Total Assigned Customers'), value: cust.total     ?? 0 },
@@ -100,7 +118,7 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Total Assigned')}</span>}
-                value={cust.total ?? 0}
+                value={totalAssigned}
                 prefix={<TeamOutlined style={{ color: '#1890ff' }} />}
                 valueStyle={{ color: '#1890ff', fontSize: isMobile ? 20 : 24 }}
               />
@@ -110,9 +128,9 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Total Collected')}</span>}
-                value={col.totalCollected ?? 0}
+                value={totalCollected}
                 prefix={<DollarCircleOutlined style={{ color: '#52c41a' }} />}
-                formatter={moneyFormatter}
+                formatter={formatMoney}
                 valueStyle={{ color: '#52c41a', fontSize: isMobile ? 16 : 22 }}
               />
             </Card>
@@ -121,9 +139,9 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Pending Amount')}</span>}
-                value={col.totalPending ?? 0}
+                value={totalPending}
                 prefix={<DollarCircleOutlined style={{ color: '#ff4d4f' }} />}
-                formatter={moneyFormatter}
+                formatter={formatMoney}
                 valueStyle={{ color: '#ff4d4f', fontSize: isMobile ? 16 : 22 }}
               />
             </Card>
@@ -136,9 +154,9 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('This Month Collected')}</span>}
-                value={col.monthCollected ?? 0}
+                value={monthCollected}
                 prefix={<DollarCircleOutlined style={{ color: '#1890ff' }} />}
-                formatter={moneyFormatter}
+                formatter={formatMoney}
                 valueStyle={{ color: '#1890ff', fontSize: isMobile ? 14 : 20 }}
               />
             </Card>
@@ -147,7 +165,7 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Overdue Installments')}</span>}
-                value={inst.overdue ?? 0}
+                value={overdueCount}
                 prefix={<WarningOutlined style={{ color: '#ff4d4f' }} />}
                 valueStyle={{ color: '#ff4d4f', fontSize: isMobile ? 20 : 24 }}
               />
@@ -157,7 +175,7 @@ export default function StaffDashboard() {
             <Card bordered={false} style={cardStyle} styles={bodyPad}>
               <Statistic
                 title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Upcoming (7 Days)')}</span>}
-                value={inst.upcoming ?? 0}
+                value={upcomingCount}
                 prefix={<CalendarOutlined style={{ color: '#faad14' }} />}
                 valueStyle={{ color: '#faad14', fontSize: isMobile ? 20 : 24 }}
               />
@@ -199,6 +217,7 @@ export default function StaffDashboard() {
             size="small"
           />
         </Card>
+
       </div>
     </DashboardLayout>
   );
