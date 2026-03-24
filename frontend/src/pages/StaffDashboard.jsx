@@ -29,11 +29,10 @@ export default function StaffDashboard() {
   const isMobile           = !screens.md;
   const [loading, setLoading] = useState(true);
 
-  // useFetch internally does: setData(apiResponse.result)
-  // So dashboardData = apiResponse.result = the flat object directly
   const { result: dashboardData, error } = useFetch(() =>
-    request.get({ entity: 'dashboard/staff' })
+    request.get({ entity: 'dashboard/summary' })
   );
+
 
   useEffect(() => {
     if (dashboardData || error) setLoading(false);
@@ -68,157 +67,84 @@ export default function StaffDashboard() {
   // ── FIX 3: dashboardData IS already the result object (useFetch unwraps it).
   //    Never add .result again — that gives undefined.
   //    Read flat fields first, nested collections as fallback.
-  const safeData = dashboardData ?? {};
-
-  const totalCollected = safeData.totalCollected  ?? safeData.collections?.totalCollected ?? 0;
-  const totalPending   = safeData.pendingAmount   ?? safeData.collections?.totalPending   ?? 0;
-  const monthCollected = safeData.monthCollected  ?? safeData.collections?.monthCollected  ?? 0;
-  const overdueCount   = safeData.overdueCount    ?? safeData.installments?.overdue        ?? 0;
-  const upcomingCount  = safeData.upcomingCount   ?? safeData.installments?.upcoming       ?? 0;
-  const efficiency     = safeData.performance?.efficiency ?? 0;
-  const cust           = safeData.customerMetrics ?? {};
-  const totalAssigned  = cust.total ?? safeData.totalAssigned ?? 0;
-
-  const summaryRows = [
-    { key: '1', metric: translate('Total Assigned Customers'), value: cust.total     ?? 0 },
-    { key: '2', metric: translate('Active'),                   value: cust.active    ?? 0 },
-    { key: '3', metric: translate('Completed'),                value: cust.completed ?? 0 },
-    { key: '4', metric: translate('Defaulted'),                value: cust.defaulted ?? 0 },
-  ];
-
-  const summaryColumns = [
-    { title: translate('Metric'), dataIndex: 'metric', key: 'metric' },
-    {
-      title: translate('Value'), dataIndex: 'value', key: 'value', align: 'right',
-      render: (v) => <Typography.Text strong>{v}</Typography.Text>,
-    },
-  ];
-
-  const cardStyle = {
-    borderRadius: 10,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-    height: '100%',
-  };
-  const bodyPad = { body: { padding: isMobile ? '14px 12px' : '20px 16px' } };
+  const data = dashboardData.result || {};
+  const { totalGiven = 0, totalPending = 0 } = data;
 
   return (
     <DashboardLayout>
-      <div style={{ padding: isMobile ? '12px 10px' : '24px' }}>
+      <div style={{ 
+        padding: isMobile ? '12px 10px' : '24px',
+        background: '#f5f5f5', 
+        minHeight: '80vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ maxWidth: 800, width: '100%' }}>
+          <Typography.Title
+            level={isMobile ? 4 : 3}
+            style={{ marginBottom: isMobile ? 14 : 24, marginTop: 0, textAlign: 'center' }}
+          >
+            {translate('Dashboard')}
+          </Typography.Title>
 
-        <Typography.Title
-          level={isMobile ? 4 : 3}
-          style={{ marginBottom: isMobile ? 14 : 24, marginTop: 0 }}
-        >
-          {translate('Dashboard')}
-        </Typography.Title>
-
-        {/* Row 1 — top 3 KPIs */}
-        <Row gutter={[10, 10]} style={{ marginBottom: 10 }}>
-          <Col xs={24} sm={8}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Total Assigned')}</span>}
-                value={totalAssigned}
-                prefix={<TeamOutlined style={{ color: '#1890ff' }} />}
-                valueStyle={{ color: '#1890ff', fontSize: isMobile ? 20 : 24 }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={8}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Total Collected')}</span>}
-                value={totalCollected}
-                prefix={<DollarCircleOutlined style={{ color: '#52c41a' }} />}
-                formatter={formatMoney}
-                valueStyle={{ color: '#52c41a', fontSize: isMobile ? 16 : 22 }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={8}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Pending Amount')}</span>}
-                value={totalPending}
-                prefix={<DollarCircleOutlined style={{ color: '#ff4d4f' }} />}
-                formatter={formatMoney}
-                valueStyle={{ color: '#ff4d4f', fontSize: isMobile ? 16 : 22 }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Row 2 — secondary KPIs */}
-        <Row gutter={[10, 10]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('This Month Collected')}</span>}
-                value={monthCollected}
-                prefix={<DollarCircleOutlined style={{ color: '#1890ff' }} />}
-                formatter={formatMoney}
-                valueStyle={{ color: '#1890ff', fontSize: isMobile ? 14 : 20 }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Overdue Installments')}</span>}
-                value={overdueCount}
-                prefix={<WarningOutlined style={{ color: '#ff4d4f' }} />}
-                valueStyle={{ color: '#ff4d4f', fontSize: isMobile ? 20 : 24 }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <Statistic
-                title={<span style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c' }}>{translate('Upcoming (7 Days)')}</span>}
-                value={upcomingCount}
-                prefix={<CalendarOutlined style={{ color: '#faad14' }} />}
-                valueStyle={{ color: '#faad14', fontSize: isMobile ? 20 : 24 }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card bordered={false} style={cardStyle} styles={bodyPad}>
-              <div style={{ fontSize: isMobile ? 11 : 13, color: '#8c8c8c', marginBottom: 6 }}>
-                {translate('Efficiency')}
-              </div>
-              <Typography.Text
-                strong
-                style={{ fontSize: isMobile ? 18 : 22, color: efficiency >= 70 ? '#52c41a' : '#ff4d4f' }}
+          <Row gutter={[32, 32]} justify="center" align="middle">
+            <Col xs={24} lg={12}>
+              <Card 
+                style={{ 
+                  height: isMobile ? 160 : 220, 
+                  textAlign: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  borderRadius: 12 
+                }}
+                bodyStyle={{ padding: isMobile ? '30px 20px' : '50px 20px' }}
               >
-                {efficiency}%
-              </Typography.Text>
-              <Progress
-                percent={Math.min(efficiency, 100)}
-                showInfo={false}
-                strokeColor={efficiency >= 70 ? '#52c41a' : '#ff4d4f'}
-                size="small"
-                style={{ marginTop: 6, marginBottom: 0 }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Customer Summary table */}
-        <Card
-          title={translate('Customer Summary')}
-          bordered={false}
-          style={{ borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-        >
-          <Table
-            rowKey="key"
-            dataSource={summaryRows}
-            columns={summaryColumns}
-            pagination={false}
-            size="small"
-          />
-        </Card>
-
+                <Statistic
+                  title="TOTAL GIVEN"
+                  value={totalGiven}
+                  prefix="₹"
+                  formatter={moneyFormatter}
+                  valueStyle={{ 
+                    fontSize: isMobile ? 28 : 40, 
+                    color: '#52c41a',
+                    fontWeight: 700
+                  }}
+                />
+                <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                  Total Loan Amount Disbursed (Active Clients)
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card 
+                style={{ 
+                  height: isMobile ? 160 : 220, 
+                  textAlign: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  borderRadius: 12 
+                }}
+                bodyStyle={{ padding: isMobile ? '30px 20px' : '50px 20px' }}
+              >
+                <Statistic
+                  title="TOTAL PENDING"
+                  value={totalPending}
+                  prefix="₹"
+                  formatter={moneyFormatter}
+                  valueStyle={{ 
+                    fontSize: isMobile ? 28 : 40, 
+                    color: '#ff4d4f',
+                    fontWeight: 700
+                  }}
+                />
+                <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                  Outstanding Balance (Active Clients)
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
       </div>
     </DashboardLayout>
   );
 }
+

@@ -1,22 +1,12 @@
 /**
  * RepaymentForm.jsx — Webaac Solutions Finance Management
- * Fixes:
- *  - Mobile responsive layout (xs breakpoints)
- *  - Proper status normalization
- *  - amountPaid not watched (prevents cursor-jump)
- *  - Hidden fields rendered so form.setFieldValue works
- *  - paymentDate required for paid/late
+ * Update mode: Client, Due Date, Total Amount, Principal, Interest,
+ *              Amount Paid, Balance → all visually normal but non-editable
+ * Status follows existing transition logic unchanged.
  */
 import {
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  DatePicker,
-  Row,
-  Col,
-  Button,
-  Tag,
+  Form, Input, InputNumber, Select, DatePicker,
+  Row, Col, Button, Tag,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useCallback } from 'react';
@@ -49,13 +39,21 @@ const normalizeRepaymentStatus = (status) => {
 
 const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 
+// ── Shared style: white background, full opacity, normal text ─────────────────
+const ROStyle = {
+  backgroundColor: '#ffffff',
+  color:           'rgba(0,0,0,0.88)',
+  cursor:          'default',
+  boxShadow:       'none',
+  pointerEvents:   'none',   // blocks all mouse interaction at CSS level
+};
+
 export default function RepaymentForm({ isUpdateForm = false }) {
   const translate      = useLanguage();
   const { dateFormat } = useDate();
   const { TextArea }   = Input;
   const form           = Form.useFormInstance();
 
-  /* ── Watched values (amountPaid intentionally NOT watched — prevents cursor-jump) */
   const amount            = Form.useWatch('amount',            form);
   const status            = Form.useWatch('status',            form);
   const originalStatus    = Form.useWatch('_originalStatus',   form);
@@ -63,21 +61,21 @@ export default function RepaymentForm({ isUpdateForm = false }) {
   const paymentDate       = Form.useWatch('paymentDate',       form);
   const dueDate           = Form.useWatch('date',              form);
   const client            = Form.useWatch('client',            form);
+  const principal         = Form.useWatch('principal',         form);
+  const interest          = Form.useWatch('interest',          form);
 
-  /* ── Safe numerics */
-  const totalAmount  = round2(Number(amount) || 0);
+  const totalAmount  = round2(Number(amount)    || 0);
   const paidAmount   = round2(Number(form.getFieldValue('amountPaid')) || 0);
   const addPayment   = round2(Number(additionalPayment) || 0);
-  const originalPaid = round2(Number(form.getFieldValue('_originalAmountPaid')) || 0);
 
   const normalizedStatus         = normalizeRepaymentStatus(status);
   const normalizedOriginalStatus = normalizeRepaymentStatus(originalStatus || status);
 
   const isStatusReadonly = ['paid', 'late'].includes(normalizedOriginalStatus);
-  const isFirstPartial   = normalizedStatus === 'partial' && originalPaid <= 0;
+  const isFirstPartial   = normalizedStatus === 'partial' &&
+    round2(Number(form.getFieldValue('_originalAmountPaid')) || 0) <= 0;
   const balanceAmount    = round2(Math.max(0, totalAmount - (paidAmount + addPayment)));
 
-  /* ── Status options */
   const statusOptions = useMemo(() => {
     if (!isUpdateForm) return STATUS_OPTIONS;
     switch (normalizedOriginalStatus) {
@@ -90,32 +88,25 @@ export default function RepaymentForm({ isUpdateForm = false }) {
     }
   }, [isUpdateForm, normalizedOriginalStatus]);
 
-  /* ── Effects */
   useEffect(() => {
-    if (isUpdateForm && normalizedOriginalStatus === 'paid') {
+    if (isUpdateForm && normalizedOriginalStatus === 'paid')
       form.setFieldValue('status', 'paid');
-    }
   }, [form, isUpdateForm, normalizedOriginalStatus]);
 
   useEffect(() => {
-    if (['paid', 'late'].includes(normalizedStatus) && totalAmount > 0) {
+    if (['paid', 'late'].includes(normalizedStatus) && totalAmount > 0)
       form.setFieldValue('amountPaid', totalAmount);
-    }
   }, [form, normalizedStatus, totalAmount]);
 
   useEffect(() => {
-    if (
-      normalizedStatus === 'paid' && paymentDate && dueDate &&
-      dayjs(paymentDate).isAfter(dueDate)
-    ) {
+    if (normalizedStatus === 'paid' && paymentDate && dueDate &&
+        dayjs(paymentDate).isAfter(dueDate))
       form.setFieldValue('status', 'late');
-    }
   }, [form, normalizedStatus, paymentDate, dueDate]);
 
   useEffect(() => {
-    if (isStatusReadonly && normalizedStatus !== normalizedOriginalStatus) {
+    if (isStatusReadonly && normalizedStatus !== normalizedOriginalStatus)
       form.setFieldValue('status', normalizedOriginalStatus);
-    }
   }, [form, isStatusReadonly, normalizedStatus, normalizedOriginalStatus]);
 
   useEffect(() => {
@@ -124,7 +115,6 @@ export default function RepaymentForm({ isUpdateForm = false }) {
     form.setFieldValue('_originalAmountPaid', initialPaid);
   }, [isUpdateForm, client, dueDate]);
 
-  /* ── Partial payment */
   const handlePartialPayment = useCallback(() => {
     const remainingBalance = totalAmount - paidAmount;
     if (addPayment <= 0) {
@@ -138,9 +128,18 @@ export default function RepaymentForm({ isUpdateForm = false }) {
     form.setFieldsValue({ amountPaid: round2(paidAmount + addPayment), additionalPayment: undefined });
   }, [paidAmount, addPayment, totalAmount, form]);
 
+  // ── Resolve client display name ─────────────────────────────────────────
+  // client field may be an id string, an object {_id, name}, or undefined
+  const clientDisplayName = useMemo(() => {
+    if (!client) return '';
+    if (typeof client === 'object' && client?.name) return client.name;
+    // If it's just an ID, the SelectAsync already renders the name — handled below
+    return null;
+  }, [client]);
+
   return (
     <>
-      {/* Status badge (read-only display) */}
+      {/* Current status badge */}
       {isUpdateForm && normalizedStatus && (
         <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: '#8c8c8c', fontSize: 13 }}>Current Status:</span>
@@ -150,17 +149,34 @@ export default function RepaymentForm({ isUpdateForm = false }) {
         </div>
       )}
 
-      {/* CLIENT */}
+      {/* ── CLIENT ─────────────────────────────────────────────────────────── */}
       <Form.Item label={translate('Client')} name="client" rules={[{ required: true }]}>
-        <SelectAsync
-          entity="client"
-          displayLabels={['name']}
-          placeholder={translate('select_client')}
-          disabled={isUpdateForm}
-        />
+        {isUpdateForm ? (
+          // Wrap in a div with pointerEvents none so nothing inside is clickable
+          <div style={{ pointerEvents: 'none' }}>
+            {clientDisplayName !== null ? (
+              // Object shape — just show the name
+              <Input
+                value={clientDisplayName}
+                readOnly
+                style={ROStyle}
+              />
+            ) : (
+              // ID shape — SelectAsync renders the label; block interaction
+              <SelectAsync
+                entity="client"
+                displayLabels={['name']}
+                placeholder=""
+                style={{ ...ROStyle, width: '100%' }}
+              />
+            )}
+          </div>
+        ) : (
+          <SelectAsync entity="client" displayLabels={['name']} placeholder={translate('select_client')} />
+        )}
       </Form.Item>
 
-      {/* DUE DATE + TOTAL AMOUNT */}
+      {/* ── DUE DATE + TOTAL AMOUNT ─────────────────────────────────────────── */}
       <Row gutter={[12, 0]}>
         <Col xs={24} sm={12}>
           <Form.Item
@@ -170,40 +186,86 @@ export default function RepaymentForm({ isUpdateForm = false }) {
             initialValue={dayjs()}
             getValueProps={(v) => ({ value: v ? dayjs(v) : undefined })}
           >
-            <DatePicker style={{ width: '100%' }} format={dateFormat} />
+            {isUpdateForm ? (
+              <div style={{ pointerEvents: 'none' }}>
+                <DatePicker
+                  value={dueDate ? dayjs(dueDate) : undefined}
+                  style={{ ...ROStyle, width: '100%' }}
+                  format={dateFormat}
+                  inputReadOnly
+                  suffixIcon={null}
+                  allowClear={false}
+                />
+              </div>
+            ) : (
+              <DatePicker style={{ width: '100%' }} format={dateFormat} />
+            )}
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item label={translate('Total Amount')} name="amount" rules={[{ required: true }]}>
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            {isUpdateForm ? (
+              <div style={{ pointerEvents: 'none' }}>
+                <InputNumber
+                  value={totalAmount}
+                  precision={2}
+                  controls={false}
+                  style={{ ...ROStyle, width: '100%' }}
+                />
+              </div>
+            ) : (
+              <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            )}
           </Form.Item>
         </Col>
       </Row>
 
-      {/* PRINCIPAL + INTEREST */}
+      {/* ── PRINCIPAL + INTEREST ────────────────────────────────────────────── */}
       <Row gutter={[12, 0]}>
         <Col xs={12}>
           <Form.Item label={translate('Principal')} name="principal">
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            {isUpdateForm ? (
+              <div style={{ pointerEvents: 'none' }}>
+                <InputNumber
+                  value={round2(Number(principal) || 0)}
+                  precision={2}
+                  controls={false}
+                  style={{ ...ROStyle, width: '100%' }}
+                />
+              </div>
+            ) : (
+              <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            )}
           </Form.Item>
         </Col>
         <Col xs={12}>
           <Form.Item label={translate('Interest')} name="interest">
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            {isUpdateForm ? (
+              <div style={{ pointerEvents: 'none' }}>
+                <InputNumber
+                  value={round2(Number(interest) || 0)}
+                  precision={2}
+                  controls={false}
+                  style={{ ...ROStyle, width: '100%' }}
+                />
+              </div>
+            ) : (
+              <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+            )}
           </Form.Item>
         </Col>
       </Row>
 
-      {/* STATUS */}
+      {/* ── STATUS — transition logic unchanged ────────────────────────────── */}
       <Form.Item label={translate('Status')} name="status" rules={[{ required: true }]} initialValue="not_started">
         <Select options={statusOptions} disabled={isStatusReadonly} />
       </Form.Item>
 
-      {/* Hidden tracking fields — must be rendered for setFieldValue to work */}
+      {/* Hidden tracking fields */}
       <Form.Item name="_originalStatus"     hidden noStyle><Input /></Form.Item>
       <Form.Item name="_originalAmountPaid" hidden noStyle><Input /></Form.Item>
 
-      {/* ── PARTIAL FLOW ──────────────────────────────────────────────────── */}
+      {/* ── PARTIAL FLOW ─────────────────────────────────────────────────────── */}
       {normalizedStatus === 'partial' && (
         <>
           {isFirstPartial ? (
@@ -224,8 +286,16 @@ export default function RepaymentForm({ isUpdateForm = false }) {
           ) : (
             <Row gutter={[12, 0]} align="middle">
               <Col xs={24} sm={8}>
+                {/* Amount Paid — read-only, white, normal-looking */}
                 <Form.Item label={translate('Amount Paid')} name="amountPaid">
-                  <InputNumber disabled precision={2} style={{ width: '100%' }} />
+                  <div style={{ pointerEvents: 'none' }}>
+                    <InputNumber
+                      value={paidAmount}
+                      precision={2}
+                      controls={false}
+                      style={{ ...ROStyle, width: '100%' }}
+                    />
+                  </div>
                 </Form.Item>
               </Col>
               <Col xs={16} sm={10}>
@@ -252,13 +322,22 @@ export default function RepaymentForm({ isUpdateForm = false }) {
               </Col>
             </Row>
           )}
+
+          {/* Balance — read-only, white, normal-looking */}
           <Form.Item label={translate('Balance')}>
-            <InputNumber value={balanceAmount} readOnly disabled precision={2} style={{ width: '100%' }} />
+            <div style={{ pointerEvents: 'none' }}>
+              <InputNumber
+                value={balanceAmount}
+                precision={2}
+                controls={false}
+                style={{ ...ROStyle, width: '100%' }}
+              />
+            </div>
           </Form.Item>
         </>
       )}
 
-      {/* ── PAID / LATE FLOW ──────────────────────────────────────────────── */}
+      {/* ── PAID / LATE FLOW ─────────────────────────────────────────────────── */}
       {['paid', 'late'].includes(normalizedStatus) && (
         <>
           <Form.Item
@@ -269,12 +348,10 @@ export default function RepaymentForm({ isUpdateForm = false }) {
           >
             <DatePicker style={{ width: '100%' }} format={dateFormat} />
           </Form.Item>
-          {/* amountPaid hidden — managed by effect */}
           <Form.Item name="amountPaid" hidden noStyle><InputNumber /></Form.Item>
         </>
       )}
 
-      {/* amountPaid hidden for not_started / default (no interaction needed) */}
       {['not_started', 'default'].includes(normalizedStatus) && (
         <Form.Item name="amountPaid" hidden noStyle><InputNumber /></Form.Item>
       )}

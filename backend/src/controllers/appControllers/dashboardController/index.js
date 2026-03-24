@@ -546,4 +546,31 @@ const performanceSummary = async (req, res) => {
   }
 };
 
-module.exports = { adminDashboard, staffDashboard, reports, performanceSummary };
+/* ════════════════════════════════════════════════════════════════════════════
+   dashboardSummary — GET /api/dashboard/summary  
+   Simple global totals from all repayments (no auth needed for public dashboard)
+   ════════════════════════════════════════════════════════════════════════════ */
+const dashboardSummary = async (req, res) => {
+  try {
+    const [summary] = await Repayment.aggregate([
+      { $match: { removed: { $ne: true } } },
+      {
+        $group: {
+          _id: null,
+          totalGiven:  { $sum: '$amount' },
+          totalPending: { $sum: '$balance' },
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      result: summary || { totalGiven: 0, totalPending: 0 },
+    });
+  } catch (err) {
+    console.error('[dashboardController.dashboardSummary]', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { adminDashboard, staffDashboard, reports, performanceSummary, dashboardSummary };

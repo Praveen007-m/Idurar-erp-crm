@@ -55,17 +55,22 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
    * Convert assigned object -> assigned _id
    * So dropdown shows correct value in edit mode
    */
-  // useEffect(() => {
-  //   if (!form || !staffOptions.length) return;
-
-  //   const assigned = form.getFieldValue('assigned');
-
-  //   if (assigned && typeof assigned === 'object') {
-  //     form.setFieldsValue({
-  //       assigned: assigned._id,
-  //     });
-  //   }
-  // }, [form, staffOptions]);
+  useEffect(() => {
+    if (!form) return;
+    const assigned = form.getFieldValue('assigned');
+    if (assigned && typeof assigned === 'object') {
+      setStaffOptions((prev) => {
+        const exists = prev.find((opt) => opt.value === assigned._id);
+        if (!exists) {
+          return [...prev, { value: assigned._id, label: assigned.name || assigned.email || 'Unknown Staff' }];
+        }
+        return prev;
+      });
+      form.setFieldsValue({
+        assigned: assigned._id,
+      });
+    }
+  }, [form]);
 
   /**
    * Prevent empty string values
@@ -273,6 +278,50 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
           </Col>
         </Row>
       )}
+
+      {/* Payment Details */}
+      <div style={{ marginTop: 24, marginBottom: 16 }}>
+        <h4 style={{ color: '#1890ff', borderBottom: '1px solid #f0f0f0', paddingBottom: 8 }}>
+          {translate('Payment Details') || 'Payment Details'}
+        </h4>
+      </div>
+
+      <Row gutter={12}>
+        <Col span={24}>
+          <Form.Item label={translate('UPI ID') || 'UPI ID'} name={['paymentDetails', 'upiId']}>
+            <Input placeholder={translate('enter_upi_id') || 'Enter UPI ID (optional)'} />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={12}>
+        <Col span={24}>
+          <Form.Item label={translate('Bank Name') || 'Bank Name'} name={['paymentDetails', 'bankName']}>
+            <Input placeholder={translate('enter_bank_name') || 'Enter Bank Name'} />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={12}>
+        <Col span={12}>
+          <Form.Item label={translate('Account Number') || 'Account Number'} name={['paymentDetails', 'accountNumber']}>
+            <Input placeholder={translate('enter_account_number') || 'Enter Account Number'} />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item label={translate('IFSC Code') || 'IFSC Code'} name={['paymentDetails', 'ifscCode']}>
+            <Input placeholder={translate('enter_ifsc_code') || 'Enter IFSC Code'} />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={12}>
+        <Col span={24}>
+          <Form.Item label={translate('Account Holder Name') || 'Account Holder Name'} name={['paymentDetails', 'accountHolderName']}>
+            <Input placeholder={translate('enter_account_holder_name') || 'Enter Account Holder Name'} />
+          </Form.Item>
+        </Col>
+      </Row>
 
       {/* Save Button */}
       <div

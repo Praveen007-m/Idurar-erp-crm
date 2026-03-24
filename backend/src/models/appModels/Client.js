@@ -64,6 +64,13 @@ const schema = new mongoose.Schema({
     enum: ['active', 'paid', 'defaulted'],
     default: 'active',
   },
+    paymentDetails: {
+    upiId: { type: String, default: "" },
+    bankName: { type: String, default: "" },
+    accountHolderName: { type: String, default: "" },
+    accountNumber: { type: String, default: "" },
+    ifscCode: { type: String, default: "" }
+  },
   createdBy: { type: mongoose.Schema.ObjectId, ref: 'Admin' },
   assigned: { type: mongoose.Schema.ObjectId, ref: 'Admin' },
   created: {

@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import {
   Avatar, Badge, Button, Calendar, Card, Col, Row,
-  Space, Spin, Tag, Typography, Modal, Form, Grid,
+  Space, Spin, Tag, Typography, Modal, Form, Grid, Descriptions,
 } from 'antd';
 import { App } from 'antd';
 import { PageHeader } from '@ant-design/pro-layout';
@@ -30,29 +30,29 @@ import RepaymentForm from '@/forms/RepaymentForm';
 const { useBreakpoint } = Grid;
 
 const BOX_BORDER = '#28a7ab';
-const BOX_TEXT   = '#117a8b';
-const HEADER_BG  = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
+const BOX_TEXT = '#117a8b';
+const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const normalizeStatus = (status) => {
   const s = String(status || '').trim().toLowerCase();
   if (s === 'late payment' || s === 'late_payment') return 'late';
-  if (s === 'not-paid'     || s === 'not paid')     return 'default';
-  if (s === 'not_started'  || s === 'not started' || s === 'not-started') return 'not-started';
+  if (s === 'not-paid' || s === 'not paid') return 'default';
+  if (s === 'not_started' || s === 'not started' || s === 'not-started') return 'not-started';
   return s || 'not-started';
 };
 
 const getDisplayStatus = (repayment) => {
-  const today  = new Date();
-  const due    = new Date(repayment?.date);
+  const today = new Date();
+  const due = new Date(repayment?.date);
   const status = normalizeStatus(repayment?.status);
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
-  if (status === 'paid')    return 'paid';
-  if (status === 'late')    return 'late';
+  if (status === 'paid') return 'paid';
+  if (status === 'late') return 'late';
   if (status === 'partial') return 'partial';
-  if (today < due)          return 'not-started';
+  if (today < due) return 'not-started';
   return 'default';
 };
 
@@ -69,8 +69,8 @@ function WeekListView({ weekDays, eventsByDate, moneyFormatter, onEventClick }) 
   return (
     <div>
       {weekDays.map((day) => {
-        const key     = day.format('YYYY-MM-DD');
-        const events  = eventsByDate[key] || [];
+        const key = day.format('YYYY-MM-DD');
+        const events = eventsByDate[key] || [];
         const isToday = day.isSame(dayjs(), 'day');
         return (
           <div
@@ -124,28 +124,32 @@ function WeekListView({ weekDays, eventsByDate, moneyFormatter, onEventClick }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function CustomerCalendar() {
-  const { clientId }       = useParams();
-  const translate          = useLanguage();
+  const { clientId } = useParams();
+  const translate = useLanguage();
   const { moneyFormatter } = useMoney();
-  const { dateFormat }     = useDate();
-  const navigate           = useNavigate();
-  const dispatch           = useDispatch();
-  const screens            = useBreakpoint();
-  const isMobile           = !screens.md;
-  const { notification }   = App.useApp();
+  const { dateFormat } = useDate();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
+  const { notification } = App.useApp();
 
   const { result: client, isLoading: isClientLoading } = useSelector(selectReadItem);
 
-  const [repayments,          setRepayments]          = useState([]);
+  // DEBUGGING: Log the raw payload from API
+  console.log('[DEBUG] Full Client Data Payload:', client);
+
+  const [repayments, setRepayments] = useState([]);
   const [isRepaymentsLoading, setIsRepaymentsLoading] = useState(false);
-  const [calendarMonth,       setCalendarMonth]       = useState(dayjs());
-  const [weekStart,           setWeekStart]           = useState(dayjs().startOf('week'));
+  const [calendarMonth, setCalendarMonth] = useState(dayjs());
+  const [weekStart, setWeekStart] = useState(dayjs().startOf('week'));
 
   // ── Edit modal state ──────────────────────────────────────────────────────
-  const [editModalOpen,    setEditModalOpen]    = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editingRepayment, setEditingRepayment] = useState(null);
-  const [submitLoading,    setSubmitLoading]    = useState(false);
-  const [form]                                 = Form.useForm();
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [form] = Form.useForm();
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day')),
@@ -160,7 +164,7 @@ export default function CustomerCalendar() {
       if (response.success) setRepayments(response.result || []);
       else setRepayments([]);
     } catch { setRepayments([]); }
-    finally  { setIsRepaymentsLoading(false); }
+    finally { setIsRepaymentsLoading(false); }
   }, [clientId]);
 
   useEffect(() => {
@@ -176,9 +180,9 @@ export default function CustomerCalendar() {
     repayments.map((r) => {
       const status = getDisplayStatus(r);
       return {
-        id:        r._id,
-        date:      dayjs(r.date),
-        color:     repaymentStatusColor[status] || repaymentStatusColor['not-started'],
+        id: r._id,
+        date: dayjs(r.date),
+        color: repaymentStatusColor[status] || repaymentStatusColor['not-started'],
         repayment: r,
         status,
       };
@@ -212,11 +216,11 @@ export default function CustomerCalendar() {
     setEditingRepayment(repayment);
     form.setFieldsValue({
       ...repayment,
-      status:          normalizeStatus(repayment.status),
+      status: normalizeStatus(repayment.status),
       _originalStatus: normalizeStatus(repayment.status),
-      date:            repayment.date        ? dayjs(repayment.date)        : null,
-      paymentDate:     repayment.paymentDate ? dayjs(repayment.paymentDate) : null,
-      amountPaid:      repayment.amountPaid ?? 0,
+      date: repayment.date ? dayjs(repayment.date) : null,
+      paymentDate: repayment.paymentDate ? dayjs(repayment.paymentDate) : null,
+      amountPaid: repayment.amountPaid ?? 0,
     });
     setEditModalOpen(true);
   }, [form]);
@@ -248,14 +252,14 @@ export default function CustomerCalendar() {
       const values = await form.validateFields();
 
       const updateResponse = await request.update({
-        entity:   'repayment',
-        id:       editingRepayment._id,
+        entity: 'repayment',
+        id: editingRepayment._id,
         jsonData: formatPayload(values),
       });
 
       if (!updateResponse?.success || !updateResponse?.result) {
         notification.error({
-          message:     translate('Update failed'),
+          message: translate('Update failed'),
           description: updateResponse?.message || translate('Something went wrong'),
         });
         return;
@@ -275,7 +279,7 @@ export default function CustomerCalendar() {
     } catch (error) {
       if (error?.errorFields) return; // form validation — shown inline
       notification.error({
-        message:     translate('Operation failed'),
+        message: translate('Operation failed'),
         description: error?.message || translate('Something went wrong'),
       });
     } finally {
@@ -300,10 +304,16 @@ export default function CustomerCalendar() {
           }
           ghost={false}
           extra={[
-            <Button key="view-list" size={isMobile ? 'small' : 'middle'}
-              onClick={() => navigate(`/repayment/client/${clientId}`)}>
-              {translate('View List')}
-            </Button>,
+            <Space key="actions" direction={isMobile ? 'vertical' : 'horizontal'} style={{ width: '100%', alignItems: isMobile ? 'flex-end' : 'center' }}>
+              <Button size={isMobile ? 'small' : 'middle'}
+                onClick={() => navigate(`/repayment/client/${clientId}`)}>
+                {translate('View List')}
+              </Button>
+              <Button size={isMobile ? 'small' : 'middle'} type="primary"
+                onClick={() => setDetailsModalOpen(true)}>
+                {translate('Client Details') || 'Client Details'}
+              </Button>
+            </Space>,
           ]}
           style={{ padding: isMobile ? '10px 12px' : '18px 14px', borderRadius: 10, background: HEADER_BG, marginBottom: 12 }}
         />
@@ -345,9 +355,9 @@ export default function CustomerCalendar() {
         {/* Summary Stats */}
         <Row gutter={[10, 10]} style={{ marginBottom: 12 }}>
           {[
-            { label: translate('Paid'),    value: totals.paid,    color: '#52c41a', bg: '#f6ffed', icon: <CheckCircleOutlined />      },
+            { label: translate('Paid'), value: totals.paid, color: '#52c41a', bg: '#f6ffed', icon: <CheckCircleOutlined /> },
             { label: translate('Pending'), value: totals.pending, color: '#fa8c16', bg: '#fff2e8', icon: <ExclamationCircleOutlined /> },
-            { label: translate('Total'),   value: totals.total,   color: '#1890ff', bg: '#e6f7ff', icon: <DollarOutlined />           },
+            { label: translate('Total'), value: totals.total, color: '#1890ff', bg: '#e6f7ff', icon: <DollarOutlined /> },
           ].map(({ label, value, color, bg, icon }) => (
             <Col xs={24} sm={8} key={label}>
               <Card size="small" bordered={false}
@@ -374,10 +384,10 @@ export default function CustomerCalendar() {
           styles={{ body: { padding: '10px 14px' } }}
         >
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
-            <LegendDot color={repaymentStatusColor.paid}           label="Paid"        />
-            <LegendDot color={repaymentStatusColor.late}           label="Late"        />
-            <LegendDot color={repaymentStatusColor.partial}        label="Partial"     />
-            <LegendDot color={repaymentStatusColor.default}        label="Default"     />
+            <LegendDot color={repaymentStatusColor.paid} label="Paid" />
+            <LegendDot color={repaymentStatusColor.late} label="Late" />
+            <LegendDot color={repaymentStatusColor.partial} label="Partial" />
+            <LegendDot color={repaymentStatusColor.default} label="Default" />
             <LegendDot color={repaymentStatusColor['not-started']} label="Not Started" />
           </div>
         </Card>
@@ -423,11 +433,11 @@ export default function CustomerCalendar() {
                   if (!date.isSame(calendarMonth, 'month'))
                     return <div style={{ minHeight: 100, padding: 6, background: '#fafafa' }} />;
 
-                  const dateKey   = date.format('YYYY-MM-DD');
+                  const dateKey = date.format('YYYY-MM-DD');
                   const dayEvents = eventsByDate[dateKey] || [];
-                  const visible   = dayEvents.slice(0, 2);
-                  const hidden    = Math.max(dayEvents.length - 2, 0);
-                  const isToday   = date.isSame(dayjs(), 'day');
+                  const visible = dayEvents.slice(0, 2);
+                  const hidden = Math.max(dayEvents.length - 2, 0);
+                  const isToday = date.isSame(dayjs(), 'day');
 
                   return (
                     <div
@@ -498,6 +508,74 @@ export default function CustomerCalendar() {
           <Form form={form} layout="vertical">
             <RepaymentForm isUpdateForm={true} />
           </Form>
+        </Modal>
+
+        {/* ── Client Details Modal ── */}
+        <Modal
+          title={translate('Client Details') || 'Client Details'}
+          open={detailsModalOpen}
+          onCancel={() => setDetailsModalOpen(false)}
+          footer={[<Button key="close" onClick={() => setDetailsModalOpen(false)}>{translate('Close') || 'Close'}</Button>]}
+          width={800}
+        >
+          {client && (
+            <>
+              <Descriptions title={<Typography.Text type="secondary">BASIC INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
+                <Descriptions.Item label="Name">{client.name}</Descriptions.Item>
+                <Descriptions.Item label="Phone">{client.phone}</Descriptions.Item>
+                <Descriptions.Item label="Email">{client.email || '-'}</Descriptions.Item>
+                <Descriptions.Item label="Address">{client.address || '-'}</Descriptions.Item>
+                <Descriptions.Item label="Assigned Staff">{client.assigned?.name || 'Unknown Staff'}</Descriptions.Item>
+              </Descriptions>
+
+              <Descriptions title={<Typography.Text type="secondary">LOAN INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
+                <Descriptions.Item label="Loan Amount">{moneyFormatter({ amount: client.loanAmount })}</Descriptions.Item>
+                <Descriptions.Item label="Interest Rate">{client.interestRate}%</Descriptions.Item>
+                <Descriptions.Item label="Term">{client.term}</Descriptions.Item>
+                <Descriptions.Item label="Start Date">{dayjs(client.startDate).format(dateFormat)}</Descriptions.Item>
+                <Descriptions.Item label="Ending Date">{client.endDate ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
+                <Descriptions.Item label="Repayment Type">{client.repaymentType}</Descriptions.Item>
+                <Descriptions.Item label="Interest Type">{client.interestType}</Descriptions.Item>
+                <Descriptions.Item label="Status">
+                  <Tag color={client.status === 'active' ? 'blue' : client.status === 'paid' ? 'green' : 'red'}>
+                    {client.status?.toUpperCase()}
+                  </Tag>
+                </Descriptions.Item>
+              </Descriptions>
+
+              <Descriptions title={<Typography.Text type="secondary">PAYMENT INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
+{(() => {
+                  const pd = client.paymentDetails || {};
+                  const upiId = pd.upiId || client.upiId;
+                  const bankName = pd.bankName || client.bankName;
+                  const accountNumber = pd.accountNumber || client.accountNumber;
+                  const ifscCode = pd.ifscCode || client.ifscCode;
+                  const accountHolderName = pd.accountHolderName || client.accountHolderName;
+
+                  if (upiId) {
+                    return (
+                      <>
+                        <Descriptions.Item label="Payment Mode"><Tag color="purple">UPI</Tag></Descriptions.Item>
+                        <Descriptions.Item label="UPI ID">{upiId}</Descriptions.Item>
+                      </>
+                    );
+                  } else if (bankName || accountNumber) {
+                    return (
+                      <>
+                        <Descriptions.Item label="Payment Mode"><Tag color="blue">Bank Transfer</Tag></Descriptions.Item>
+                        {bankName && <Descriptions.Item label="Bank Name">{bankName}</Descriptions.Item>}
+                        {accountNumber && <Descriptions.Item label="Account Number">{accountNumber}</Descriptions.Item>}
+                        {ifscCode && <Descriptions.Item label="IFSC Code">{ifscCode}</Descriptions.Item>}
+                        {accountHolderName && <Descriptions.Item label="Account Holder">{accountHolderName}</Descriptions.Item>}
+                      </>
+                    );
+                  } else {
+                    return <Descriptions.Item label="Payment Mode"><Tag color="green">Cash</Tag></Descriptions.Item>;
+                  }
+                })()}
+              </Descriptions>
+            </>
+          )}
         </Modal>
 
       </Spin>

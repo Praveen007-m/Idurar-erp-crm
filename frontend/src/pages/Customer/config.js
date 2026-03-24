@@ -97,10 +97,10 @@ export const fields = {
     render: (text, record) => {
       // Handle populated assigned staff object
       if (record.assigned && typeof record.assigned === 'object') {
-        return record.assigned.name || record.assigned.email || '-';
+        return record.assigned.name || record.assigned.email || 'Unknown Staff';
       }
-      // Handle null or undefined
-      return '-';
+      // Handle null or undefined or raw ObjectId strings
+      return 'Unknown Staff';
     },
   },
 };

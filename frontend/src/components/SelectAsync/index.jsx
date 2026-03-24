@@ -40,6 +40,16 @@ const SelectAsync = ({
       const val = value?.[outputValue] ?? value;
       setCurrentValue(val);
       onChange(val);
+      
+      if (typeof value === 'object' && value !== null && value[outputValue]) {
+        setOptions((prev) => {
+          const exists = prev.find((opt) => (opt[outputValue] ?? opt) === val);
+          if (!exists) {
+            return [...prev, value];
+          }
+          return prev;
+        });
+      }
     }
   }, [value]);
 

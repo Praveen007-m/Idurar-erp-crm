@@ -74,8 +74,15 @@ const reports = async (req, res) => {
     const statusRows = await repCol().aggregate([
       { $match: { removed: { $ne: true } } },
       {
+        $addFields: {
+          normalizedStatus: {
+            $toLower: { $trim: { input: { $toString: "$status" } } }
+          }
+        }
+      },
+      {
         $group: {
-          _id:   '$status',
+          _id:   "$normalizedStatus",
           count: { $sum: 1 },
           total: { $sum: '$totalAmount' },
           paid:  { $sum: '$amountPaid' },
@@ -84,14 +91,21 @@ const reports = async (req, res) => {
       { $sort: { count: -1 } },
     ]).toArray();
 
-    const grandTotal      = statusRows.reduce((s, r) => s + r.count, 0);
+    const grandTotal = statusRows.reduce((s, r) => s + r.count, 0);
     const statusBreakdown = statusRows.map((r) => ({
-      status:     r._id,
-      count:      r.count,
-      total:      r.total,
-      paid:       r.paid,
+      status: r._id,
+      displayStatus: {
+        'not_started': 'Not Started',
+        'partial': 'Partial',
+        'late': 'Late',
+        'default': 'Default',
+        'paid': 'Paid'
+      }[r._id] || r._id,
+      count: r.count,
+      total: r.total,
+      paid: r.paid,
       percentage: grandTotal > 0 ? +((r.count / grandTotal) * 100).toFixed(1) : 0,
-    }));
+    })); 
 
     // Plan-wise analytics — group by client.repaymentType
     const planAnalytics = await repCol().aggregate([

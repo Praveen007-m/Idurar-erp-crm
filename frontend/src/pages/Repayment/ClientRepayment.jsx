@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { notification } from 'antd';
-import { Tag, Row, Col, Card, Table, Dropdown, Modal, Form } from 'antd';
+import { Tag, Row, Col, Card, Table, Dropdown, Modal, Form, Button, Descriptions } from 'antd';
 import { PageHeader } from '@ant-design/pro-layout';
 import dayjs from 'dayjs';
 import { useMoney, useDate } from '@/settings';
@@ -76,6 +76,7 @@ export default function ClientRepayment() {
     const { result: repaymentsResult, isLoading: isRepaymentsLoading } = useSelector(selectListItems);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [detailsModalOpen, setDetailsModalOpen] = useState(false);
     const [currentRepayment, setCurrentRepayment] = useState(null);
     const [form] = Form.useForm();
     const [localRepayments, setLocalRepayments] = useState([]);
@@ -285,6 +286,11 @@ export default function ClientRepayment() {
                 backIcon={<ArrowLeftOutlined />}
                 title={translate('Client Repayments')}
                 ghost={false}
+                extra={[
+                    <Button key="details" type="primary" onClick={() => setDetailsModalOpen(true)}>
+                        {translate('Client Details') || 'Client Details'}
+                    </Button>
+                ]}
             />
             <Row gutter={[24, 24]}>
                 <Col span={24}>
@@ -337,6 +343,73 @@ export default function ClientRepayment() {
                 <Form form={form} layout="vertical">
                     <RepaymentForm isUpdateForm={true} />
                 </Form>
+            </Modal>
+
+            <Modal
+                title={translate('Client Details') || 'Client Details'}
+                open={detailsModalOpen}
+                onCancel={() => setDetailsModalOpen(false)}
+                footer={[<Button key="close" onClick={() => setDetailsModalOpen(false)}>Close</Button>]}
+                width={800}
+            >
+                {client && (
+                    <>
+                        <Descriptions title="Basic Info" bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
+                            <Descriptions.Item label="Name">{client.name}</Descriptions.Item>
+                            <Descriptions.Item label="Phone">{client.phone}</Descriptions.Item>
+                            <Descriptions.Item label="Email">{client.email || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="Address">{client.address || '-'}</Descriptions.Item>
+                            <Descriptions.Item label="Assigned Staff">{client.assigned?.name || 'Unknown Staff'}</Descriptions.Item>
+                        </Descriptions>
+
+                        <Descriptions title="Loan Info" bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
+                            <Descriptions.Item label="Loan Amount">{moneyFormatter({ amount: client.loanAmount })}</Descriptions.Item>
+                            <Descriptions.Item label="Interest Rate">{client.interestRate}%</Descriptions.Item>
+                            <Descriptions.Item label="Term">{client.term}</Descriptions.Item>
+                            <Descriptions.Item label="Start Date">{dayjs(client.startDate).format(dateFormat)}</Descriptions.Item>
+                            <Descriptions.Item label="Ending Date">{client.endDate ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
+                            <Descriptions.Item label="Repayment Type">{client.repaymentType}</Descriptions.Item>
+                            <Descriptions.Item label="Interest Type">{client.interestType}</Descriptions.Item>
+                            <Descriptions.Item label="Status">
+                                <Tag color={client.status === 'active' ? 'blue' : client.status === 'paid' ? 'green' : 'red'}>
+                                    {client.status?.toUpperCase()}
+                                </Tag>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Descriptions title={<Typography.Text type="secondary">PAYMENT INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
+                            {(() => {
+                                const pd = client.paymentDetails || {};
+                                const upiId = pd.upiId || client.upiId;
+                                const bankName = pd.bankName || client.bankName;
+                                const accountNumber = pd.accountNumber || client.accountNumber;
+                                const ifscCode = pd.ifscCode || client.ifscCode;
+                                const accountHolderName = pd.accountHolderName || client.accountHolderName;
+
+                                if (upiId) {
+                                    return (
+                                        <>
+                                            <Descriptions.Item label="Payment Mode"><Tag color="purple">UPI</Tag></Descriptions.Item>
+                                            <Descriptions.Item label="UPI ID">{upiId}</Descriptions.Item>
+                                        </>
+                                    );
+                                } else if (bankName || accountNumber) {
+                                    return (
+                                        <>
+                                            <Descriptions.Item label="Payment Mode"><Tag color="blue">Bank Transfer</Tag></Descriptions.Item>
+                                            {bankName && <Descriptions.Item label="Bank Name">{bankName}</Descriptions.Item>}
+                                            {accountNumber && <Descriptions.Item label="Account Number">{accountNumber}</Descriptions.Item>}
+                                            {ifscCode && <Descriptions.Item label="IFSC Code">{ifscCode}</Descriptions.Item>}
+                                            {accountHolderName && <Descriptions.Item label="Account Holder">{accountHolderName}</Descriptions.Item>}
+                                        </>
+                                    );
+                                } else {
+                                    return <Descriptions.Item label="Payment Mode"><Tag color="green">Cash</Tag></Descriptions.Item>;
+                                }
+                            })()}
+                        </Descriptions>
+                    </>
+                )}
             </Modal>
         </ErpLayout>
     );

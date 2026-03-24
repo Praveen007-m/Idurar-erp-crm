@@ -201,6 +201,14 @@ router.route('/reports')
 router.route('/dashboard/performance-summary')
   .get(catchErrors(dashboardController.performanceSummary));
 
+router.route('/dashboard/summary')
+  .get(catchErrors(dashboardController.dashboardSummary));
+
+// New Dashboard Summary endpoint
+router.route('/dashboard/summary')
+  .get(checkRole(['admin', 'owner', 'staff']), catchErrors(dashboardController.dashboardSummary));
+
+
 // =============================
 // GENERIC ENTITY ROUTES
 // =============================

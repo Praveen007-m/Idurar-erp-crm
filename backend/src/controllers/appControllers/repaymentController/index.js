@@ -228,7 +228,7 @@ function modelController() {
       }
 
       const [repayments, count] = await Promise.all([
-        Model.find(filterQuery).skip(skip).limit(limit).sort({ [sortBy]: sortValue }).populate().exec(),
+        Model.find(filterQuery).skip(skip).limit(limit).sort({ [sortBy]: sortValue }).populate('client').exec(),
         Model.countDocuments(filterQuery),
       ]);
 
@@ -288,7 +288,9 @@ function modelController() {
       delete createPayload.balance;
       createPayload.createdBy = req.admin._id;  // ← ADD THIS LINE
       const createData = updatePaymentStatus(createPayload);
-      const result     = await Model.create(createData);
+      const createdDoc = await Model.create(createData);
+      
+      const result = await Model.findById(createdDoc._id).populate('client').exec();
 
       // syncRepaymentPayment now handles null/undefined client safely
       await syncRepaymentPayment({
@@ -355,7 +357,7 @@ function modelController() {
 
       const updatedRepayment = await Model.findByIdAndUpdate(id, updateData, {
         new: true, runValidators: true,
-      }).populate();
+      }).populate('client');
 
       if (!updatedRepayment) {
         return res.status(404).json({ success: false, result: null, message: 'Repayment not found' });

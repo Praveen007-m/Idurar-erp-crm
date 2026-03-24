@@ -70,7 +70,9 @@ function modelController() {
         });
       }
 
+      console.log('[Client Create] Incoming paymentDetails:', req.body.paymentDetails);
       const result = await Model.create(req.body);
+      console.log('[Client Create] Saved client paymentDetails:', result.paymentDetails);
 
       // Generate installments automatically (non-blocking)
       // We use a separate try/catch so that if installment generation fails,
@@ -94,8 +96,10 @@ function modelController() {
         console.error('[Client Create] Stack trace:', installmentError.stack);
       }
 
+      const populatedResult = await Model.findById(result._id).populate('assigned', 'name email role').exec();
+
       // Convert Mongoose document to plain object to avoid circular references
-      const clientData = result.toObject();
+      const clientData = populatedResult.toObject();
 
       return res.status(200).json({
         success: true,
@@ -235,10 +239,12 @@ function modelController() {
         }
       }
 
+      console.log('[Client Update] Incoming paymentDetails:', req.body.paymentDetails);
       const result = await Model.findOneAndUpdate(filter, req.body, {
         new: true,
         runValidators: true,
       }).populate('assigned', 'name email').exec();
+      console.log('[Client Update] Updated client paymentDetails:', result.paymentDetails);
 
       if (loanFieldsChanged) {
         // Delete existing unpaid installments and regenerate
