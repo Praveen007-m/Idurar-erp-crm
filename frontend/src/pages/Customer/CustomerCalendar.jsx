@@ -590,35 +590,86 @@ export default function CustomerCalendar() {
                 </Descriptions.Item>
               </Descriptions>
 
-              <Descriptions title={<Typography.Text type="secondary">PAYMENT INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
+              <Descriptions
+                title={<Typography.Text type="secondary">PAYMENT INFO</Typography.Text>}
+                bordered
+                column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+              >
                 {(() => {
                   const pd = client.paymentDetails || {};
+
                   const upiId = pd.upiId || client.upiId;
                   const bankName = pd.bankName || client.bankName;
                   const accountNumber = pd.accountNumber || client.accountNumber;
                   const ifscCode = pd.ifscCode || client.ifscCode;
-                  const accountHolderName = pd.accountHolderName || client.accountHolderName;
+                  const accountHolderName =
+                    pd.accountHolderName || client.accountHolderName;
 
-                  if (upiId) {
+                  const hasBank = !!(bankName || accountNumber || ifscCode);
+                  const hasUPI = !!upiId;
+
+                  // ❌ Nothing stored → Cash
+                  if (!hasBank && !hasUPI) {
                     return (
-                      <>
-                        <Descriptions.Item label="Payment Mode"><Tag color="purple">UPI</Tag></Descriptions.Item>
-                        <Descriptions.Item label="UPI ID">{upiId}</Descriptions.Item>
-                      </>
+                      <Descriptions.Item label="Payment Mode">
+                        <Tag color="green">Cash</Tag>
+                      </Descriptions.Item>
                     );
-                  } else if (bankName || accountNumber) {
-                    return (
-                      <>
-                        <Descriptions.Item label="Payment Mode"><Tag color="blue">Bank Transfer</Tag></Descriptions.Item>
-                        {bankName && <Descriptions.Item label="Bank Name">{bankName}</Descriptions.Item>}
-                        {accountNumber && <Descriptions.Item label="Account Number">{accountNumber}</Descriptions.Item>}
-                        {ifscCode && <Descriptions.Item label="IFSC Code">{ifscCode}</Descriptions.Item>}
-                        {accountHolderName && <Descriptions.Item label="Account Holder">{accountHolderName}</Descriptions.Item>}
-                      </>
-                    );
-                  } else {
-                    return <Descriptions.Item label="Payment Mode"><Tag color="green">Cash</Tag></Descriptions.Item>;
                   }
+
+                  // ⭐ Build ONE payment mode label
+                  const modes = [];
+                  // if (hasBank) modes.push("Bank Transfer");
+                  if (hasUPI) modes.push("UPI");
+
+                  return (
+                    <>
+                      {/* ⭐ ONE Payment Mode row */}
+                      <Descriptions.Item label="Payment Mode">
+                        {modes.map((m) => (
+                          <Tag key={m} color={m === "UPI" ? "purple" : "blue"}>
+                            {m}
+                          </Tag>
+                        ))}
+                      </Descriptions.Item>
+
+                      {/* ⭐ Bank details */}
+                      {hasBank && (
+                        <>
+                          {bankName && (
+                            <Descriptions.Item label="Bank Name">
+                              {bankName}
+                            </Descriptions.Item>
+                          )}
+
+                          {accountHolderName && (
+                            <Descriptions.Item label="Account Holder">
+                              {accountHolderName}
+                            </Descriptions.Item>
+                          )}
+
+                          {accountNumber && (
+                            <Descriptions.Item label="Account Number">
+                              {accountNumber}
+                            </Descriptions.Item>
+                          )}
+
+                          {ifscCode && (
+                            <Descriptions.Item label="IFSC Code">
+                              {ifscCode}
+                            </Descriptions.Item>
+                          )}
+                        </>
+                      )}
+
+                      {/* ⭐ UPI details */}
+                      {hasUPI && (
+                        <Descriptions.Item label="UPI ID">
+                          {upiId}
+                        </Descriptions.Item>
+                      )}
+                    </>
+                  );
                 })()}
               </Descriptions>
             </>
