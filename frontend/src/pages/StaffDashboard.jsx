@@ -1,54 +1,49 @@
 /**
  * StaffDashboard.jsx — Webaac Solutions Finance Management
- * Place: frontend/src/pages/StaffDashboard.jsx
+ * EXACT layout + REAL DATA from API (dashboard/staff)
  */
+
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Spin, Alert, Statistic,
-  Progress, Typography, Grid, Table,
+  Row, Col, Card, Spin, Alert,
+  Statistic, Progress, Typography,
+  Grid, Table
 } from 'antd';
+
 import {
-  TeamOutlined, DollarCircleOutlined,
-  WarningOutlined, CalendarOutlined,
+  TeamOutlined,
+  DollarCircleOutlined,
+  WarningOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
-import { useSelector } from 'react-redux';
+
 import { request } from '@/request';
 import useFetch from '@/hooks/useFetch';
 import useLanguage from '@/locale/useLanguage';
 import { useMoney } from '@/settings';
-import { selectMoneyFormat } from '@/redux/settings/selectors';
 import { DashboardLayout } from '@/layout';
 
 const { useBreakpoint } = Grid;
 
 export default function StaffDashboard() {
-  const translate          = useLanguage();
-  const { moneyFormatter } = useMoney();
-  const moneySettings      = useSelector(selectMoneyFormat);
-  const screens            = useBreakpoint();
-  const isMobile           = !screens.md;
-  const [loading, setLoading] = useState(true);
 
-  const { result: dashboardData, error } = useFetch(() =>
-    request.get({ entity: 'dashboard/summary' })
+  const translate = useLanguage();
+  const { moneyFormatter } = useMoney();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
+
+  // 🔥 Fetch Staff Dashboard Data
+  const { result: data, error } = useFetch(() =>
+    request.get({ entity: 'dashboard/staff' })
   );
 
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (dashboardData || error) setLoading(false);
-  }, [dashboardData, error]);
+    if (data || error) setLoading(false);
+  }, [data, error]);
 
-  // ── FIX 1: currency_code — try every possible Redux key, fallback to 'INR'
-  const currencyCode =
-    moneySettings?.default_currency_code ||
-    moneySettings?.currency_code         ||
-    moneySettings?.currencyCode          ||
-    'INR';
-
-  // ── FIX 2: wrap moneyFormatter so Antd Statistic's formatter(value) call
-  //    is converted to moneyFormatter({ amount, currency_code }) correctly
-  const formatMoney = (value) =>
-    moneyFormatter({ amount: Number(value ?? 0), currency_code: currencyCode });
+  // ───────── Loading ─────────
 
   if (loading) return (
     <DashboardLayout>
@@ -64,87 +59,161 @@ export default function StaffDashboard() {
     </DashboardLayout>
   );
 
-  // ── FIX 3: dashboardData IS already the result object (useFetch unwraps it).
-  //    Never add .result again — that gives undefined.
-  //    Read flat fields first, nested collections as fallback.
-  const data = dashboardData || {};
-  const { totalCollected: totalGiven = 0, pendingAmount: totalPending = 0 } = data;
+  // ───────── CORRECT FIELD MAPPING FROM API ─────────
+
+  const {
+    totalAssigned = 0,
+    totalCollected = 0,
+    pendingAmount = 0,
+    monthCollected = 0,
+    overdueCount = 0,
+    upcomingCount = 0,
+    performance = {},
+    customerMetrics = {},
+  } = data || {};
+
+  const efficiency = performance?.efficiency ?? 0;
+
+  // ───────── Summary Table Data ─────────
+
+  const tableData = [
+    { key: 1, metric: 'Total Assigned Customers', value: customerMetrics.total || totalAssigned },
+    { key: 2, metric: 'Active', value: customerMetrics.active || 0 },
+    { key: 3, metric: 'Completed', value: customerMetrics.completed || 0 },
+    { key: 4, metric: 'Defaulted', value: customerMetrics.defaulted || 0 },
+  ];
+
+  const columns = [
+    { title: 'Metric', dataIndex: 'metric', key: 'metric' },
+    { title: 'Value', dataIndex: 'value', key: 'value', align: 'right' },
+  ];
 
   return (
     <DashboardLayout>
-      <div style={{ 
-        padding: isMobile ? '12px 10px' : '24px',
-        background: '#f5f5f5', 
-        minHeight: '80vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ maxWidth: 800, width: '100%' }}>
-          <Typography.Title
-            level={isMobile ? 4 : 3}
-            style={{ marginBottom: isMobile ? 14 : 24, marginTop: 0, textAlign: 'center' }}
-          >
-            {translate('Dashboard')}
-          </Typography.Title>
 
-          <Row gutter={[32, 32]} justify="center" align="middle">
-            <Col xs={24} lg={12}>
-              <Card 
-                style={{ 
-                  height: isMobile ? 160 : 220, 
-                  textAlign: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  borderRadius: 12 
-                }}
-                bodyStyle={{ padding: isMobile ? '30px 20px' : '50px 20px' }}
-              >
-                <Statistic
-                  title="TOTAL GIVEN"
-                  value={totalGiven}
-                  prefix="₹"
-                  formatter={moneyFormatter}
-                  valueStyle={{ 
-                    fontSize: isMobile ? 28 : 40, 
-                    color: '#52c41a',
-                    fontWeight: 700
-                  }}
-                />
-                <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
-                  Total Loan Amount Disbursed (Active Clients)
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Card 
-                style={{ 
-                  height: isMobile ? 160 : 220, 
-                  textAlign: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  borderRadius: 12 
-                }}
-                bodyStyle={{ padding: isMobile ? '30px 20px' : '50px 20px' }}
-              >
-                <Statistic
-                  title="TOTAL PENDING"
-                  value={totalPending}
-                  prefix="₹"
-                  formatter={moneyFormatter}
-                  valueStyle={{ 
-                    fontSize: isMobile ? 28 : 40, 
-                    color: '#ff4d4f',
-                    fontWeight: 700
-                  }}
-                />
-                <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
-                  Outstanding Balance (Active Clients)
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </div>
+      <div style={{
+        padding: isMobile ? 12 : 24,
+        background: '#f5f5f5',
+        minHeight: '80vh'
+      }}>
+
+        {/* ───────── Title ───────── */}
+
+        <Typography.Title level={3} style={{ marginBottom: 24 }}>
+          {translate('Dashboard')}
+        </Typography.Title>
+
+        {/* ───────── TOP CARDS ───────── */}
+
+        <Row gutter={[16, 16]}>
+
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Total Assigned"
+                value={totalAssigned}
+                prefix={<TeamOutlined />}
+              />
+            </Card>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Total Collected"
+                value={totalCollected}
+                formatter={(v) => moneyFormatter({ amount: v })}
+                prefix={<DollarCircleOutlined style={{ color: '#52c41a' }} />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Pending Amount"
+                value={pendingAmount}
+                formatter={(v) => moneyFormatter({ amount: v })}
+                prefix={<DollarCircleOutlined style={{ color: '#ff4d4f' }} />}
+                valueStyle={{ color: '#ff4d4f' }}
+              />
+            </Card>
+          </Col>
+
+        </Row>
+
+        {/* ───────── SECOND ROW ───────── */}
+
+        <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
+
+          <Col xs={24} md={6}>
+            <Card>
+              <Statistic
+                title="This Month Collected"
+                value={monthCollected}
+                formatter={(v) => moneyFormatter({ amount: v })}
+                prefix={<DollarCircleOutlined style={{ color: '#1890ff' }} />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+
+          <Col xs={24} md={6}>
+            <Card>
+              <Statistic
+                title="Overdue Installments"
+                value={overdueCount}
+                prefix={<WarningOutlined style={{ color: '#ff4d4f' }} />}
+                valueStyle={{ color: '#ff4d4f' }}
+              />
+            </Card>
+          </Col>
+
+          <Col xs={24} md={6}>
+            <Card>
+              <Statistic
+                title="Upcoming (7 Days)"
+                value={upcomingCount}
+                prefix={<CalendarOutlined style={{ color: '#faad14' }} />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+
+          <Col xs={24} md={6}>
+            <Card>
+              <Statistic
+                title="Efficiency"
+                value={efficiency}
+                suffix="%"
+                valueStyle={{ color: '#ff4d4f' }}
+              />
+
+              <Progress
+                percent={efficiency}
+                size="small"
+                showInfo={false}
+                strokeColor="#ff4d4f"
+              />
+            </Card>
+          </Col>
+
+        </Row>
+
+        {/* ───────── SUMMARY TABLE ───────── */}
+
+        <Card title="Customer Summary" style={{ marginTop: 16 }}>
+          <Table
+            columns={columns}
+            dataSource={tableData}
+            pagination={false}
+            size="small"
+          />
+        </Card>
+
       </div>
+
     </DashboardLayout>
   );
 }
-
