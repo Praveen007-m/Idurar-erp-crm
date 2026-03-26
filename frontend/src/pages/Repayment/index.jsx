@@ -1,5 +1,7 @@
 /**
  * pages/repayment/index.jsx — Webaac Solutions Finance Management
+ * FIX: openRepaymentEditor now uses getDisplayStatus() so past-due
+ *      repayments show 'default' in the form instead of 'not-started'
  */
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
@@ -24,11 +26,8 @@ import RepaymentForm from '@/forms/RepaymentForm';
 import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 
 const BOX_BORDER = '#28a7ab';
-const BOX_BG    = '#e9f7f8';
 const BOX_TEXT  = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const normalizeRepaymentStatus = (status) => {
   const s = String(status || '').trim().toLowerCase();
@@ -38,6 +37,7 @@ const normalizeRepaymentStatus = (status) => {
   return s || 'not-started';
 };
 
+// ── KEY FIX: computes the REAL display status including past-due logic ────────
 const getDisplayStatus = (repayment) => {
   const today = new Date();
   const due   = new Date(repayment?.date);
@@ -48,17 +48,13 @@ const getDisplayStatus = (repayment) => {
   if (status === 'late')    return 'late';
   if (status === 'partial') return 'partial';
   if (today < due)          return 'not-started';
-  return 'default';
+  return 'default'; // ← past due and not paid = default
 };
 
-const getRepaymentColor  = (r) => repaymentStatusColor[getDisplayStatus(r)] || repaymentStatusColor['not-started'];
-const getStatusClassName = (r) => `status-${getDisplayStatus(r)}`;
-const displayStatusPriority = { default: 1, late: 2, partial: 3, paid: 4, 'not-started': 5 };
-const roundCurrency = (v) => Number.parseFloat(Number(v || 0).toFixed(2));
+const getStatusClassName      = (r) => `status-${getDisplayStatus(r)}`;
+const displayStatusPriority   = { default: 1, late: 2, partial: 3, paid: 4, 'not-started': 5 };
+const roundCurrency           = (v) => Number.parseFloat(Number(v || 0).toFixed(2));
 
-// ── FIX: Always extract plain ObjectId string from client field ───────────────
-// The backend returns client as a populated object {_id, name, ...}.
-// Sending the full object back causes autopopulate to crash on .toString().
 const resolveClientId = (client) => {
   if (!client) return null;
   if (typeof client === 'string') return client;
@@ -81,10 +77,9 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
   } else {
     const periodRate = monthlyRate * (totalMonths / installmentCount);
     if (periodRate > 0) {
-      const installmentAmount =
-        (principal * periodRate * Math.pow(1 + periodRate, installmentCount)) /
-        (Math.pow(1 + periodRate, installmentCount) - 1);
-      totalInterest = installmentAmount * installmentCount - principal;
+      const amt = (principal * periodRate * Math.pow(1 + periodRate, installmentCount)) /
+                  (Math.pow(1 + periodRate, installmentCount) - 1);
+      totalInterest = amt * installmentCount - principal;
     }
   }
 
@@ -93,7 +88,7 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
   const installmentAmount       = principalPerInstallment + interestPerInstallment;
 
   return {
-    client:     resolveClientId(client._id || client),  // ← always plain string ID
+    client:     resolveClientId(client._id || client),
     date:       dayjs(dueDate).toISOString(),
     amount:     roundCurrency(installmentAmount),
     principal:  roundCurrency(principalPerInstallment),
@@ -102,7 +97,6 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
   };
 };
 
-// ── Legend ────────────────────────────────────────────────────────────────────
 const LegendItem = ({ color, label }) => (
   <div style={{ display: 'flex', alignItems: 'center' }}>
     <span style={{
@@ -114,7 +108,6 @@ const LegendItem = ({ color, label }) => (
   </div>
 );
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function Repayment() {
   const { notification } = App.useApp();
   const translate = useLanguage();
@@ -123,16 +116,16 @@ export default function Repayment() {
   const { result: listResult, isLoading } = useSelector(selectListItems);
   const clients = Array.isArray(listResult?.items) ? listResult.items : [];
 
-  const [isMobile, setIsMobile]               = useState(() => window.innerWidth <= 768);
-  const [searchTerm, setSearchTerm]           = useState('');
-  const [currentDate, setCurrentDate]         = useState(dayjs());
+  const [isMobile, setIsMobile]             = useState(() => window.innerWidth <= 768);
+  const [searchTerm, setSearchTerm]         = useState('');
+  const [currentDate, setCurrentDate]       = useState(dayjs());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRepayment, setEditingRepayment] = useState(null);
-  const [form]                                = Form.useForm();
-  const [statusFilter, setStatusFilter]       = useState('all');
-  const [repayments, setRepayments]           = useState([]);
-  const [submitLoading, setSubmitLoading]     = useState(false);
-  const [expandedDays, setExpandedDays]       = useState(new Set());
+  const [form]                              = Form.useForm();
+  const [statusFilter, setStatusFilter]     = useState('all');
+  const [repayments, setRepayments]         = useState([]);
+  const [submitLoading, setSubmitLoading]   = useState(false);
+  const [expandedDays, setExpandedDays]     = useState(new Set());
 
   const loadClients = useCallback(() => {
     dispatch(crud.list({ entity: 'client', options: { page: 1, items: 100 } }));
@@ -140,10 +133,7 @@ export default function Repayment() {
 
   const loadRepayments = useCallback(async () => {
     try {
-      const response = await request.list({
-        entity: 'repayment',
-        options: { items: 500, page: 1 },
-      });
+      const response = await request.list({ entity: 'repayment', options: { items: 500, page: 1 } });
       if (response?.success) setRepayments(response.result || []);
     } catch { /* silent */ }
   }, []);
@@ -174,7 +164,7 @@ export default function Repayment() {
     if (client?.repaymentType === 'Daily')  unit = 'day';
     for (let i = 1; i <= term; i++) {
       const dueDate = startDate.add(i, unit);
-      if (dueDate.isAfter(monthEnd))   break;
+      if (dueDate.isAfter(monthEnd))    break;
       if (dueDate.isBefore(monthStart)) continue;
       dueDates.push(dueDate.date());
     }
@@ -206,11 +196,11 @@ export default function Repayment() {
     if (!Array.isArray(repayments)) return map;
     repayments.forEach((item) => {
       const clientId = item.client?._id || item.client;
-      const key = `${clientId}-${dayjs(item.date).format('YYYY-MM-DD')}`;
-      const cur = map.get(key);
-      const curPriority  = cur  ? displayStatusPriority[getDisplayStatus(cur)]  ?? 99 : 99;
-      const nextPriority = displayStatusPriority[getDisplayStatus(item)] ?? 99;
-      if (!cur || nextPriority < curPriority) map.set(key, item);
+      const key      = `${clientId}-${dayjs(item.date).format('YYYY-MM-DD')}`;
+      const cur      = map.get(key);
+      const curPri   = cur  ? displayStatusPriority[getDisplayStatus(cur)]  ?? 99 : 99;
+      const nextPri  = displayStatusPriority[getDisplayStatus(item)] ?? 99;
+      if (!cur || nextPri < curPri) map.set(key, item);
     });
     return map;
   }, [repayments]);
@@ -232,26 +222,15 @@ export default function Repayment() {
   const goToNextWeek     = useCallback(() => setCurrentDate((p) => p.add(1, 'week')),      []);
   const goToToday        = useCallback(() => setCurrentDate(dayjs()),                        []);
 
-  // ── FIX: normalize payload before sending to backend ─────────────────────
-  // Ensures client is always a plain ObjectId string, never a populated object.
-  // This is the root cause of "Cannot read properties of null (reading 'toString')".
   const formatRepaymentPayload = (values) => {
     const payload = { ...values };
-
-    // Always resolve client to plain ID string
     payload.client = resolveClientId(payload.client);
-
-    // Handle amountPaid
-    if (['paid', 'late'].includes(payload.status) && !payload.amountPaid) {
+    if (['paid', 'late'].includes(payload.status) && !payload.amountPaid)
       payload.amountPaid = payload.amount;
-    }
-
-    // Normalize dates
     payload.date = payload.date ? dayjs(payload.date).toISOString() : undefined;
     payload.paymentDate = payload.paymentDate
       ? dayjs(payload.paymentDate).toISOString()
       : (['paid', 'late'].includes(payload.status) ? new Date().toISOString() : null);
-
     return payload;
   };
 
@@ -263,16 +242,18 @@ export default function Repayment() {
     setRepayments((prev) => prev.some((r) => r._id === newR._id) ? prev : [...prev, newR]);
   }, []);
 
+  // ── KEY FIX: use getDisplayStatus() so past-due shows 'default' not 'not-started' ──
   const openRepaymentEditor = useCallback((repayment) => {
     if (!repayment) return;
+    const displayStatus = getDisplayStatus(repayment); // ← computed, not raw DB value
     setEditingRepayment(repayment);
     form.setFieldsValue({
       ...repayment,
-      status:          normalizeRepaymentStatus(repayment.status),
-      _originalStatus: normalizeRepaymentStatus(repayment.status),
+      status:          displayStatus,
+      _originalStatus: displayStatus,
       date:            repayment.date        ? dayjs(repayment.date)        : null,
       paymentDate:     repayment.paymentDate ? dayjs(repayment.paymentDate) : null,
-      amountPaid:      repayment.amountPaid ?? 0,
+      amountPaid:      repayment.amountPaid  ?? 0,
     });
     setIsEditModalOpen(true);
   }, [form]);
@@ -282,7 +263,6 @@ export default function Repayment() {
       openRepaymentEditor(repaymentRecord);
       return;
     }
-
     try {
       const formattedDate = dayjs(dueDate).format('YYYY-MM-DD');
       const response = await request.get({
@@ -299,29 +279,20 @@ export default function Repayment() {
         return;
       }
     }
-
     try {
       const createResponse = await request.create({
         entity:   'repayment',
         jsonData: buildRepaymentPayloadFromClient(client, dueDate),
       });
-
       if (!createResponse?.success || !createResponse?.result) {
-        notification.error({
-          message:     translate('Failed to open repayment'),
-          description: createResponse?.message || translate('Something went wrong'),
-        });
+        notification.error({ message: translate('Failed to open repayment'), description: createResponse?.message });
         return;
       }
-
       appendRepaymentToState(createResponse.result);
       openRepaymentEditor(createResponse.result);
       window.dispatchEvent(new Event('repayment-updated'));
     } catch (error) {
-      notification.error({
-        message:     translate('Failed to open repayment'),
-        description: error?.message || translate('Something went wrong'),
-      });
+      notification.error({ message: translate('Failed to open repayment'), description: error?.message });
     }
   };
 
@@ -331,60 +302,43 @@ export default function Repayment() {
       const values = await form.validateFields();
 
       if (!editingRepayment?._id || editingRepayment?.isVirtual) {
-        // CREATE — merge editing state but always resolve client to plain ID
         const createResponse = await request.create({
           entity:   'repayment',
           jsonData: formatRepaymentPayload({
             ...editingRepayment,
             ...values,
-            // Ensure client is the ID, not the populated object from editingRepayment
             client: resolveClientId(editingRepayment?.client) || resolveClientId(values?.client),
           }),
         });
-
         if (!createResponse?.success || !createResponse?.result) {
-          notification.error({
-            message:     translate('Create failed'),
-            description: createResponse?.message || translate('Something went wrong'),
-          });
+          notification.error({ message: translate('Create failed'), description: createResponse?.message });
           return;
         }
-
         appendRepaymentToState(createResponse.result);
         setEditingRepayment(createResponse.result);
         window.dispatchEvent(new Event('repayment-updated'));
         notification.success({ message: translate('Repayment created successfully') });
       } else {
-        // UPDATE
         const updateResponse = await request.update({
           entity:   'repayment',
           id:       editingRepayment._id,
           jsonData: formatRepaymentPayload(values),
         });
-
         if (!updateResponse?.success || !updateResponse?.result) {
-          notification.error({
-            message:     translate('Update failed'),
-            description: updateResponse?.message || translate('Something went wrong'),
-          });
+          notification.error({ message: translate('Update failed'), description: updateResponse?.message });
           return;
         }
-
         updateRepaymentInState(updateResponse.result);
         setEditingRepayment(updateResponse.result);
         window.dispatchEvent(new Event('repayment-updated'));
         notification.success({ message: translate('Repayment updated successfully') });
       }
-
       dispatch(erp.list({ entity: 'payment' }));
       setIsEditModalOpen(false);
       form.resetFields();
     } catch (error) {
       if (error?.errorFields) return;
-      notification.error({
-        message:     translate('Operation failed'),
-        description: error?.message || translate('Something went wrong'),
-      });
+      notification.error({ message: translate('Operation failed'), description: error?.message });
     } finally {
       setSubmitLoading(false);
     }
@@ -423,10 +377,7 @@ export default function Repayment() {
             </Button>
           </div>,
         ]}
-        style={{
-          padding: isMobile ? '12px 10px' : '18px 14px',
-          borderRadius: 10, background: HEADER_BG, marginBottom: 12,
-        }}
+        style={{ padding: isMobile ? '12px 10px' : '18px 14px', borderRadius: 10, background: HEADER_BG, marginBottom: 12 }}
       />
 
       <Spin spinning={isLoading}>
@@ -534,16 +485,14 @@ export default function Repayment() {
                 onPanelChange={(v) => { setCurrentDate(v); setExpandedDays(new Set()); }}
                 onChange={(v) => setCurrentDate(v)}
                 fullCellRender={(date) => {
-                  if (!date.isSame(currentDate, 'month')) {
+                  if (!date.isSame(currentDate, 'month'))
                     return <div style={{ minHeight: 110, padding: 6, background: '#fafafa' }} />;
-                  }
                   const dayKey     = date.format('YYYY-MM-DD');
                   const dayClients = clientsByDay[date.date()] || [];
                   const isExpanded = expandedDays.has(dayKey);
                   const PREVIEW    = 2;
                   const visible    = isExpanded ? dayClients : dayClients.slice(0, PREVIEW);
                   const hidden     = Math.max(dayClients.length - PREVIEW, 0);
-
                   return (
                     <div className="calendar-cell" style={{
                       minHeight: 110, padding: 6, borderRadius: 8,
@@ -565,53 +514,23 @@ export default function Repayment() {
                             <button type="button"
                               key={`${client._id}-${date.date()}`}
                               className={`calendar-client-entry ${getStatusClassName(forDisplay)}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleClientClick(client, date.format('YYYY-MM-DD'), repayment);
-                              }}
+                              onClick={(e) => { e.stopPropagation(); handleClientClick(client, date.format('YYYY-MM-DD'), repayment); }}
                               style={{ fontSize: 11, width: '100%', textAlign: 'left' }}>
                               {client?.name}
                             </button>
                           );
                         })}
-                        {/* Show more / show less toggle */}
                         {hidden > 0 && !isExpanded && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedDays((prev) => {
-                                const next = new Set(prev);
-                                next.add(dayKey);
-                                return next;
-                              });
-                            }}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: BOX_TEXT, fontSize: 11, padding: '2px 0',
-                              textAlign: 'left', width: '100%', fontWeight: 600,
-                            }}
-                          >
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); setExpandedDays((prev) => { const next = new Set(prev); next.add(dayKey); return next; }); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: BOX_TEXT, fontSize: 11, padding: '2px 0', textAlign: 'left', width: '100%', fontWeight: 600 }}>
                             +{hidden} more ▾
                           </button>
                         )}
                         {isExpanded && dayClients.length > PREVIEW && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedDays((prev) => {
-                                const next = new Set(prev);
-                                next.delete(dayKey);
-                                return next;
-                              });
-                            }}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: BOX_TEXT, fontSize: 11, padding: '2px 0',
-                              textAlign: 'left', width: '100%', fontWeight: 600,
-                            }}
-                          >
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); setExpandedDays((prev) => { const next = new Set(prev); next.delete(dayKey); return next; }); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: BOX_TEXT, fontSize: 11, padding: '2px 0', textAlign: 'left', width: '100%', fontWeight: 600 }}>
                             ▴ show less
                           </button>
                         )}
@@ -630,11 +549,7 @@ export default function Repayment() {
         open={isEditModalOpen}
         onOk={handleEditModalOk}
         confirmLoading={submitLoading}
-        onCancel={() => {
-          setIsEditModalOpen(false);
-          setEditingRepayment(null);
-          form.resetFields();
-        }}
+        onCancel={() => { setIsEditModalOpen(false); setEditingRepayment(null); form.resetFields(); }}
         width={isMobile ? '95vw' : 680}
         style={{ top: isMobile ? 10 : 24 }}
         maskClosable={false}
