@@ -14,6 +14,7 @@ const upload   = require('@/middlewares/upload');
 const Client    = require('@/models/appModels/Client');
 const Admin     = require('@/models/coreModels/Admin');
 const Repayment = require('@/models/appModels/Repayment');
+const Payment = require('@/models/appModels/Payment');
 
 // ── Safe match helper ─────────────────────────────────────────────────────────
 // Handles documents where 'removed' field may or may not exist in MongoDB
@@ -67,7 +68,7 @@ router.route('/staff/performance')
     const staffIds   = staffList.map((s) => s._id);
     const now        = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     // 2. Aggregate clients per staff (uses Client.assigned field)
     const clientAgg = await Client.aggregate([
@@ -96,52 +97,73 @@ router.route('/staff/performance')
         },
       },
       { $unwind: '$clientDoc' },
-      { $match: { 'clientDoc.assigned': { $in: staffIds } } },
+      {
+        $match: {
+          removed: { $ne: true },
+          'clientDoc.assigned': { $in: staffIds },
+        },
+      },
       {
         $group: {
           _id: '$clientDoc.assigned',
-          totalCollected: {
-            $sum: {
-              $cond: [
-                { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] },
-                { $ifNull: ['$amountPaid', 0] },
-                0,
-              ],
-            },
-          },
-          monthCollected: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] },
-                    { $gte: ['$paymentDate', monthStart] },
-                  ],
-                },
-                { $ifNull: ['$amountPaid', 0] },
-                0,
-              ],
-            },
-          },
           totalPending: {
-            $sum: {
-              $cond: [
-                { $not: { $in: ['$status', ['paid', 'late', 'PAID', 'LATE']] } },
-                { $ifNull: ['$balance', 0] },
-                0,
-              ],
-            },
+            $sum: { $ifNull: ['$balance', 0] },
           },
           overdueCount: {
-            $sum: { $cond: [{ $in: ['$status', ['default', 'DEFAULT']] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['default', 'late', 'DEFAULT', 'LATE']] }, 1, 0] },
           },
           totalRepayments: { $sum: 1 },
         },
       },
     ]);
 
+    const paymentAgg = await Payment.aggregate([
+      {
+        $match: {
+          removed: { $ne: true },
+          reference: { $exists: true, $ne: null },
+        },
+      },
+      {
+        $lookup: {
+          from: 'clients',
+          localField: 'client',
+          foreignField: '_id',
+          as: 'clientDoc',
+        },
+      },
+      { $unwind: '$clientDoc' },
+      {
+        $match: {
+          'clientDoc.assigned': { $in: staffIds },
+        },
+      },
+      {
+        $group: {
+          _id: '$clientDoc.assigned',
+          totalCollected: { $sum: { $ifNull: ['$amount', 0] } },
+          monthCollected: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$date', monthStart] },
+                    { $lte: ['$date', monthEnd] },
+                  ],
+                },
+                { $ifNull: ['$amount', 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
     const repaymentMap = {};
     repaymentAgg.forEach((row) => { repaymentMap[row._id.toString()] = row; });
+    const paymentMap = {};
+    paymentAgg.forEach((row) => { paymentMap[row._id.toString()] = row; });
 
     // 4. Merge into final result
     const staffWise = staffList.map((staff) => {
@@ -149,7 +171,8 @@ router.route('/staff/performance')
       const clients = clientMap[sid]    || {};
       const reps    = repaymentMap[sid] || {};
 
-      const totalCollected = reps.totalCollected || 0;
+      const payments = paymentMap[sid] || {};
+      const totalCollected = payments.totalCollected || 0;
       const totalPending   = reps.totalPending   || 0;
       const efficiency     = totalCollected + totalPending > 0
         ? Math.round((totalCollected / (totalCollected + totalPending)) * 100)
@@ -164,7 +187,7 @@ router.route('/staff/performance')
         activeCount:     clients.activeCount    || 0,
         defaultCount:    clients.defaultCount   || 0,
         totalCollected,
-        monthCollected:  reps.monthCollected    || 0,
+        monthCollected:  payments.monthCollected || 0,
         totalPending,
         overdueCount:    reps.overdueCount      || 0,
         totalRepayments: reps.totalRepayments   || 0,

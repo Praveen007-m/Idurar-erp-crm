@@ -164,7 +164,7 @@ export default function Reports() {
   // ── Defaulted amount from status breakdown ────────────────────────────────
   const defaultedAmount = (data?.statusBreakdown || [])
     .filter((s) => String(s.status).toLowerCase() === 'default')
-    .reduce((sum, s) => sum + Number(s.total || 0), 0);
+    .reduce((sum, s) => sum + Number(s.pending || 0), 0);
 
   const kpis = [
     { title: 'Total Collected',  value: data?.collections?.totalCollected ?? 0, icon: <DollarCircleOutlined />, color: '#16a34a', bg: '#f0fdf4' },

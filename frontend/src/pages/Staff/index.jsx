@@ -162,7 +162,7 @@ export default function Staff() {
     <Card
       size="small"
       style={{ marginBottom: 10, borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-      bodyStyle={{ padding: '12px 14px' }}
+      styles={{ body: { padding: '12px 14px' } }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>

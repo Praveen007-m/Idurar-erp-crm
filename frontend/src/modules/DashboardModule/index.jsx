@@ -457,7 +457,7 @@ export default function DashboardModule() {
                     showInfo={false}
                     strokeColor={color}
                     trailColor="#f0f0f0"
-                    strokeWidth={6}
+                    size="small"
                     style={{ margin: 0 }}
                   />
                 </div>
@@ -481,7 +481,7 @@ export default function DashboardModule() {
               showInfo={false}
               strokeColor={effColor(collectionRatio)}
               status={effStatus(collectionRatio)}
-              strokeWidth={10}
+              size="default"
               style={{ marginBottom: 8 }}
             />
             <Row gutter={8}>
@@ -517,7 +517,7 @@ export default function DashboardModule() {
               showInfo={false}
               strokeColor={effColor(efficiency)}
               status={effStatus(efficiency)}
-              strokeWidth={10}
+              size="default"
               style={{ marginBottom: 8 }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>

@@ -66,33 +66,79 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
   const installmentCount = Number.parseInt(client?.term, 10);
   const principal        = Number.parseFloat(client?.loanAmount || 0);
   const monthlyRate      = Number.parseFloat(client?.interestRate || 0) / 100;
+  const targetDate       = dayjs(dueDate).format('YYYY-MM-DD');
+  const start            = dayjs(client?.startDate);
+
+  if (!installmentCount || !start.isValid()) {
+    return {
+      client: resolveClientId(client._id || client),
+      date: dayjs(dueDate).toISOString(),
+      amount: 0,
+      principal: 0,
+      interest: 0,
+      amountPaid: 0,
+    };
+  }
 
   let totalMonths = installmentCount;
-  if (client?.repaymentType === 'Weekly') totalMonths = installmentCount / 4;
+  if (client?.repaymentType === 'Weekly') totalMonths = installmentCount / 4.33;
   if (client?.repaymentType === 'Daily')  totalMonths = installmentCount / 30;
 
-  let totalInterest = 0;
+  const principalPerInstallment = installmentCount > 0 ? principal / installmentCount : 0;
+  let durationUnit = 'month';
+  let periodsPerMonth = 1;
+  if (client?.repaymentType === 'Weekly') {
+    durationUnit = 'week';
+    periodsPerMonth = 4.33;
+  }
+  if (client?.repaymentType === 'Daily') {
+    durationUnit = 'day';
+    periodsPerMonth = 30;
+  }
+
+  const schedule = [];
+
   if (client?.interestType === 'flat') {
-    totalInterest = principal * monthlyRate * totalMonths;
+    const totalInterest = principal * monthlyRate * totalMonths;
+    const interestPerInstallment = installmentCount > 0 ? totalInterest / installmentCount : 0;
+
+    for (let index = 1; index <= installmentCount; index += 1) {
+      schedule.push({
+        date: start.add(index, durationUnit).format('YYYY-MM-DD'),
+        principal: roundCurrency(principalPerInstallment),
+        interest: roundCurrency(interestPerInstallment),
+        amount: roundCurrency(principalPerInstallment + interestPerInstallment),
+      });
+    }
   } else {
-    const periodRate = monthlyRate * (totalMonths / installmentCount);
-    if (periodRate > 0) {
-      const amt = (principal * periodRate * Math.pow(1 + periodRate, installmentCount)) /
-                  (Math.pow(1 + periodRate, installmentCount) - 1);
-      totalInterest = amt * installmentCount - principal;
+    const periodRate = periodsPerMonth > 0 ? monthlyRate / periodsPerMonth : monthlyRate;
+    let outstanding = principal;
+
+    for (let index = 1; index <= installmentCount; index += 1) {
+      const interest = outstanding * periodRate;
+      schedule.push({
+        date: start.add(index, durationUnit).format('YYYY-MM-DD'),
+        principal: roundCurrency(principalPerInstallment),
+        interest: roundCurrency(interest),
+        amount: roundCurrency(principalPerInstallment + interest),
+      });
+      outstanding = Math.max(0, outstanding - principalPerInstallment);
     }
   }
 
-  const interestPerInstallment  = totalInterest / installmentCount;
-  const principalPerInstallment = principal / installmentCount;
-  const installmentAmount       = principalPerInstallment + interestPerInstallment;
+  const selectedInstallment =
+    schedule.find((item) => item.date === targetDate) || schedule[0] || {
+      amount: 0,
+      principal: 0,
+      interest: 0,
+    };
 
   return {
     client:     resolveClientId(client._id || client),
     date:       dayjs(dueDate).toISOString(),
-    amount:     roundCurrency(installmentAmount),
-    principal:  roundCurrency(principalPerInstallment),
-    interest:   roundCurrency(interestPerInstallment),
+    amount:     roundCurrency(selectedInstallment.amount),
+    principal:  roundCurrency(selectedInstallment.principal),
+    interest:   roundCurrency(selectedInstallment.interest),
     amountPaid: 0,
   };
 };
@@ -549,10 +595,19 @@ export default function Repayment() {
         open={isEditModalOpen}
         onOk={handleEditModalOk}
         confirmLoading={submitLoading}
-        onCancel={() => { setIsEditModalOpen(false); setEditingRepayment(null); form.resetFields(); }}
-        width={isMobile ? '95vw' : 680}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          setEditingRepayment(null);
+          form.resetFields();
+          const active = document.activeElement;
+          if (active instanceof HTMLElement) active.blur();
+        }}
+        width={isMobile ? '95vw' : 760}
         style={{ top: isMobile ? 10 : 24 }}
+        styles={{ body: { maxHeight: isMobile ? '72vh' : '78vh', overflowY: 'auto', padding: isMobile ? 16 : 24 } }}
         maskClosable={false}
+        destroyOnClose
+        focusTriggerAfterClose={false}
       >
         <Form form={form} layout="vertical">
           <RepaymentForm isUpdateForm={true} />

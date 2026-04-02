@@ -64,6 +64,9 @@ export default function DeleteModal({ config }) {
       onOk={handleOk}
       onCancel={handleCancel}
       confirmLoading={isLoading}
+      destroyOnClose
+      focusTriggerAfterClose={false}
+      maskClosable={false}
     >
       <p>
         {deleteMessage}

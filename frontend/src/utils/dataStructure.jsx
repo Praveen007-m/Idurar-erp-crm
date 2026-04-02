@@ -14,6 +14,7 @@ export const dataForRead = ({ fields, translate }) => {
       title: field.label ? field.label : key,
       dataIndex: field.dataIndex ? field.dataIndex.join('.') : key,
       isDate: field.type === 'date',
+      render: field.render ? field.render : undefined,
     });
   });
 
@@ -50,7 +51,9 @@ export function dataForTable({ fields, translate, moneyFormatter, dateFormat }) 
         title: field.label ? translate(field.label) : translate(key),
         dataIndex: keyIndex,
         render: (_, record) => {
-          const date = dayjs(record[key]).format(dateFormat);
+          const value = record?.[key];
+          if (!value) return <Tag bordered={false} color={field.color}>-</Tag>;
+          const date = dayjs(value).format(dateFormat);
           return (
             <Tag bordered={false} color={field.color}>
               {date}
@@ -69,8 +72,11 @@ export function dataForTable({ fields, translate, moneyFormatter, dateFormat }) 
             },
           };
         },
-        render: (_, record) =>
-          moneyFormatter({ amount: record[key], currency_code: record.currency }),
+        render: (_, record) => {
+          const amount = record?.[key] ?? 0;
+          const currencyCode = record?.currency ?? 'USD';
+          return moneyFormatter({ amount, currency_code: currencyCode });
+        },
       },
       async: {
         title: field.label ? translate(field.label) : translate(key),
@@ -165,8 +171,10 @@ export function dataForTable({ fields, translate, moneyFormatter, dateFormat }) 
         title: field.label ? translate(field.label) : translate(key),
         dataIndex: keyIndex,
         render: (_, record) => {
-          return record[key].map((x) => (
-            <Tag bordered={false} key={`${uniqueId()}`} color={field.colors[x]}>
+          const arr = record?.[key];
+          if (!Array.isArray(arr)) return null;
+          return arr.map((x) => (
+            <Tag bordered={false} key={`${uniqueId()}`} color={field.colors?.[x]}>
               {x}
             </Tag>
           ));

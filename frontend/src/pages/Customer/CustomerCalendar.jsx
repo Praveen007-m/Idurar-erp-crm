@@ -547,10 +547,12 @@ export default function CustomerCalendar() {
             setEditingRepayment(null);
             form.resetFields();
           }}
-          width={isMobile ? '95vw' : 680}
+          width={isMobile ? '95vw' : 760}
           style={{ top: isMobile ? 10 : 24 }}
+          styles={{ body: { maxHeight: isMobile ? '72vh' : '78vh', overflowY: 'auto', padding: isMobile ? 16 : 24 } }}
           maskClosable={false}
           destroyOnClose
+          focusTriggerAfterClose={false}
         >
           <Form form={form} layout="vertical">
             <RepaymentForm isUpdateForm={true} />
@@ -561,9 +563,16 @@ export default function CustomerCalendar() {
         <Modal
           title={translate('Client Details') || 'Client Details'}
           open={detailsModalOpen}
-          onCancel={() => setDetailsModalOpen(false)}
+          onCancel={() => {
+            setDetailsModalOpen(false);
+            const active = document.activeElement;
+            if (active instanceof HTMLElement) active.blur();
+          }}
           footer={[<Button key="close" onClick={() => setDetailsModalOpen(false)}>{translate('Close') || 'Close'}</Button>]}
-          width={800}
+          width={isMobile ? '95vw' : 800}
+          styles={{ body: { padding: isMobile ? 16 : 24 } }}
+          destroyOnClose
+          focusTriggerAfterClose={false}
         >
           {client && (
             <>
@@ -579,8 +588,8 @@ export default function CustomerCalendar() {
                 <Descriptions.Item label="Loan Amount">{moneyFormatter({ amount: client.loanAmount })}</Descriptions.Item>
                 <Descriptions.Item label="Interest Rate">{client.interestRate}%</Descriptions.Item>
                 <Descriptions.Item label="Term">{client.term}</Descriptions.Item>
-                <Descriptions.Item label="Start Date">{dayjs(client.startDate).format(dateFormat)}</Descriptions.Item>
-                <Descriptions.Item label="Ending Date">{client.endDate ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
+                <Descriptions.Item label="Start Date">{client?.startDate && dayjs(client.startDate).isValid() ? dayjs(client.startDate).format(dateFormat) : '-'}</Descriptions.Item>
+                <Descriptions.Item label="Ending Date">{client?.endDate && dayjs(client.endDate).isValid() ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
                 <Descriptions.Item label="Repayment Type">{client.repaymentType}</Descriptions.Item>
                 <Descriptions.Item label="Interest Type">{client.interestType}</Descriptions.Item>
                 <Descriptions.Item label="Status">

@@ -108,6 +108,7 @@ export default function DataTable({ config, extra = [] }) {
       title: '',
       key: 'action',
       fixed: 'right',
+      width: 60,
       render: (_, record) => (
         <Dropdown
           menu={{
@@ -137,7 +138,6 @@ export default function DataTable({ config, extra = [] }) {
                 default:
                   break;
               }
-              // else if (key === '2')handleCloseTask
             },
           }}
           trigger={['click']}

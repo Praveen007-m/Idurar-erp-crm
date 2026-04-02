@@ -1,113 +1,126 @@
-/**
- * dashboardController/index.js  —  Webaac Solutions Finance Management
- * Place: backend/src/controllers/appControllers/dashboardController/index.js
- */
-
-const mongoose  = require('mongoose');
-const Admin     = require('@/models/coreModels/Admin');
-const Client    = require('@/models/appModels/Client');
+const mongoose = require('mongoose');
+const Client = require('@/models/appModels/Client');
 const Repayment = require('@/models/appModels/Repayment');
+const {
+  getCollectionTotals,
+  getRepaymentTotals,
+  getClientStatusSummary,
+  getRepaymentMatch,
+} = require('@/utils/repaymentMetrics');
 
-// ── date helpers ──────────────────────────────────────────────────────────────
 const startOfMonth = () => {
-  const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
+
 const startOfToday = () => {
-  const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
+
 const in7Days = () => {
   const d = new Date();
   d.setDate(d.getDate() + 7);
   d.setHours(23, 59, 59, 999);
   return d;
 };
+
 const endOfMonth = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 };
 
-const notRemoved       = { removed: { $ne: true } };
-const PAID_STATUSES    = ['paid', 'late', 'PAID', 'LATE'];
-const OVERDUE_STATUSES = ['default', 'late', 'DEFAULT', 'LATE'];
-const PENDING_STATUSES = ['not_started', 'partial', 'NOT_STARTED', 'PARTIAL'];
+const notRemoved = { removed: { $ne: true } };
 
-/* ════════════════════════════════════════════════════════════════════════════
-   adminDashboard — GET /api/dashboard/admin
-   ════════════════════════════════════════════════════════════════════════════ */
+const resolveStaffId = (req) => {
+  const staffId = req.admin?._id || req.admin?.id || req.adminId;
+  return mongoose.Types.ObjectId.isValid(staffId)
+    ? new mongoose.Types.ObjectId(String(staffId))
+    : null;
+};
+
+const getScopedClients = async (staffId = null) => {
+  const query = staffId
+    ? { ...notRemoved, assigned: staffId }
+    : { ...notRemoved };
+
+  return Client.find(query).select('_id').lean();
+};
+
+const getCustomerSummaryForClients = async (clients = []) =>
+  getClientStatusSummary({ clientIds: clients.map((client) => client._id) });
+
+const toDateRange = (from, to) => {
+  if (!from || !to) return null;
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  toDate.setHours(23, 59, 59, 999);
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return null;
+  }
+
+  return { fromDate, toDate };
+};
+
+const getDashboardPayload = async ({ clientIds = [] } = {}) => {
+  const monthStart = startOfMonth();
+  const monthEnd = endOfMonth();
+  const today = startOfToday();
+  const upcoming = in7Days();
+
+  const [collectionsAll, collectionsMonth, repaymentTotals] = await Promise.all([
+    getCollectionTotals({ clientIds }),
+    getCollectionTotals({ clientIds, from: monthStart, to: monthEnd }),
+    getRepaymentTotals({ clientIds, today, upcoming }),
+  ]);
+
+  const totalCollected = collectionsAll.totalCollected;
+  const monthCollected = collectionsMonth.totalCollected;
+  const pendingAmount = repaymentTotals.pendingBalance;
+  const totalExpected = repaymentTotals.totalExpected;
+  const efficiency = totalExpected > 0
+    ? +((totalCollected / totalExpected) * 100).toFixed(1)
+    : 0;
+
+  return {
+    totalCollected,
+    monthCollected,
+    pendingAmount,
+    overdueCount: repaymentTotals.overdueCount,
+    upcomingCount: repaymentTotals.upcomingCount,
+    totalRepayments: repaymentTotals.totalRepayments,
+    totalExpected,
+    efficiency,
+  };
+};
+
 const adminDashboard = async (req, res) => {
   try {
-    const monthStart = startOfMonth();
-    const monthEnd   = endOfMonth();
-    const today      = startOfToday();
-    const upcoming   = in7Days();
+    const clients = await getScopedClients();
+    const clientIds = clients.map((client) => client._id);
 
-    const [repAgg] = await Repayment.aggregate([
-      { $match: { ...notRemoved } },
-      {
-        $group: {
-          _id: null,
-          totalCollected:  { $sum: '$amountPaid' },
-          pendingBalance:  { $sum: '$balance'    },
-          totalExpected:   { $sum: '$amount'     },
-          totalRepayments: { $sum: 1 },
-          monthCollected: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $gte: ['$paidDate', monthStart] },
-                  { $lte: ['$paidDate', monthEnd]   },
-                ]},
-                '$amountPaid', 0,
-              ],
-            },
-          },
-          overdueCount: {
-            $sum: { $cond: [{ $in: ['$status', OVERDUE_STATUSES] }, 1, 0] },
-          },
-          upcomingCount: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $gte: ['$date', today]   },
-                  { $lte: ['$date', upcoming] },
-                  { $in:  ['$status', PENDING_STATUSES] },
-                ]},
-                1, 0,
-              ],
-            },
-          },
-        },
-      },
+    const [dashboardMetrics, customerSummary] = await Promise.all([
+      getDashboardPayload({ clientIds }),
+      getCustomerSummaryForClients(clients),
     ]);
-
-    const totalExpected  = repAgg?.totalExpected  ?? 0;
-    const totalCollected = repAgg?.totalCollected ?? 0;
-    const efficiency     = totalExpected > 0
-      ? +((totalCollected / totalExpected) * 100).toFixed(1)
-      : 0;
-
-    const totalClients     = await Client.countDocuments({ ...notRemoved });
-    const activeClients    = await Client.countDocuments({ ...notRemoved, status: 'active'    });
-    const defaultedClients = await Client.countDocuments({ ...notRemoved, status: 'defaulted' });
-    const completedClients = await Client.countDocuments({ ...notRemoved, status: 'completed' });
 
     return res.status(200).json({
       success: true,
       result: {
-        totalAssigned:   totalClients,
-        totalCollected:  repAgg?.totalCollected  ?? 0,
-        pendingAmount:   repAgg?.pendingBalance  ?? 0,
-        monthCollected:  repAgg?.monthCollected  ?? 0,
-        overdueCount:    repAgg?.overdueCount    ?? 0,
-        upcomingCount:   repAgg?.upcomingCount   ?? 0,
-        efficiency,
-        totalRepayments: repAgg?.totalRepayments ?? 0,
-        customerSummary: {
-          totalAssigned: totalClients,
-          active:        activeClients,
-          completed:     completedClients,
-          defaulted:     defaultedClients,
-        },
+        totalAssigned: customerSummary.total,
+        totalCollected: dashboardMetrics.totalCollected,
+        pendingAmount: dashboardMetrics.pendingAmount,
+        monthCollected: dashboardMetrics.monthCollected,
+        overdueCount: dashboardMetrics.overdueCount,
+        upcomingCount: dashboardMetrics.upcomingCount,
+        efficiency: dashboardMetrics.efficiency,
+        totalRepayments: dashboardMetrics.totalRepayments,
+        customerSummary,
       },
     });
   } catch (err) {
@@ -116,37 +129,26 @@ const adminDashboard = async (req, res) => {
   }
 };
 
-/* ════════════════════════════════════════════════════════════════════════════
-   staffDashboard — GET /api/dashboard/staff
-   ════════════════════════════════════════════════════════════════════════════ */
 const staffDashboard = async (req, res) => {
   try {
-    const staffId    = req.admin?._id || req.admin?.id || req.adminId;
-    const staffObjId = mongoose.Types.ObjectId.isValid(staffId)
-      ? new mongoose.Types.ObjectId(String(staffId))
-      : null;
-
-    if (!staffObjId)
+    const staffId = resolveStaffId(req);
+    if (!staffId) {
       return res.status(400).json({ success: false, message: 'Invalid staff ID' });
+    }
 
-    const monthStart = startOfMonth();
-    const monthEnd   = endOfMonth();
-    const today      = startOfToday();
-    const upcoming   = in7Days();
-
-    const staffClients = await Client.find({
-      removed:  { $ne: true },
-      assigned: staffObjId,
-    }).lean();
-
-    const clientIds = staffClients.map((c) => c._id);
+    const clients = await getScopedClients(staffId);
+    const clientIds = clients.map((client) => client._id);
 
     if (!clientIds.length) {
       return res.status(200).json({
         success: true,
         result: {
-          totalAssigned: 0, totalCollected: 0, pendingAmount: 0,
-          monthCollected: 0, overdueCount: 0, upcomingCount: 0,
+          totalAssigned: 0,
+          totalCollected: 0,
+          pendingAmount: 0,
+          monthCollected: 0,
+          overdueCount: 0,
+          upcomingCount: 0,
           performance: { efficiency: 0 },
           customerMetrics: { total: 0, active: 0, completed: 0, defaulted: 0 },
           collections: { totalCollected: 0, totalPending: 0, monthCollected: 0 },
@@ -155,84 +157,30 @@ const staffDashboard = async (req, res) => {
       });
     }
 
-    const agg = await Repayment.aggregate([
-      { $match: { ...notRemoved, client: { $in: clientIds } } },
-      {
-        $addFields: {
-          effectivePaidDate: { $ifNull: ['$paidDate', '$paymentDate'] },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalCollected:  { $sum: '$amountPaid' },
-          pendingBalance:  { $sum: '$balance'    },
-          totalExpected:   { $sum: '$amount'     },
-          totalRepayments: { $sum: 1 },
-          monthCollected: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $ne:  ['$effectivePaidDate', null] },
-                  { $gte: ['$effectivePaidDate', monthStart] },
-                  { $lte: ['$effectivePaidDate', monthEnd]   },
-                ]},
-                '$amountPaid', 0,
-              ],
-            },
-          },
-          overdueCount: {
-            $sum: { $cond: [{ $in: ['$status', OVERDUE_STATUSES] }, 1, 0] },
-          },
-          upcomingCount: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $gte: ['$date', today]   },
-                  { $lte: ['$date', upcoming] },
-                  { $in:  ['$status', PENDING_STATUSES] },
-                ]},
-                1, 0,
-              ],
-            },
-          },
-        },
-      },
+    const [dashboardMetrics, customerMetrics] = await Promise.all([
+      getDashboardPayload({ clientIds }),
+      getCustomerSummaryForClients(clients),
     ]);
-
-    const repAgg = agg[0] || {
-      totalCollected: 0, pendingBalance: 0, monthCollected: 0,
-      overdueCount: 0, upcomingCount: 0, totalExpected: 0,
-    };
-
-    const efficiency = repAgg.totalExpected > 0
-      ? +((repAgg.totalCollected / repAgg.totalExpected) * 100).toFixed(1)
-      : 0;
 
     return res.status(200).json({
       success: true,
       result: {
-        totalAssigned:  staffClients.length,
-        totalCollected: repAgg.totalCollected,
-        pendingAmount:  repAgg.pendingBalance,
-        monthCollected: repAgg.monthCollected,
-        overdueCount:   repAgg.overdueCount,
-        upcomingCount:  repAgg.upcomingCount,
-        performance: { efficiency },
-        customerMetrics: {
-          total:     staffClients.length,
-          active:    staffClients.filter((c) => c.status === 'active').length,
-          completed: staffClients.filter((c) => c.status === 'completed').length,
-          defaulted: staffClients.filter((c) => c.status === 'defaulted').length,
-        },
+        totalAssigned: customerMetrics.total,
+        totalCollected: dashboardMetrics.totalCollected,
+        pendingAmount: dashboardMetrics.pendingAmount,
+        monthCollected: dashboardMetrics.monthCollected,
+        overdueCount: dashboardMetrics.overdueCount,
+        upcomingCount: dashboardMetrics.upcomingCount,
+        performance: { efficiency: dashboardMetrics.efficiency },
+        customerMetrics,
         collections: {
-          totalCollected: repAgg.totalCollected,
-          totalPending:   repAgg.pendingBalance,
-          monthCollected: repAgg.monthCollected,
+          totalCollected: dashboardMetrics.totalCollected,
+          totalPending: dashboardMetrics.pendingAmount,
+          monthCollected: dashboardMetrics.monthCollected,
         },
         installments: {
-          overdue:  repAgg.overdueCount,
-          upcoming: repAgg.upcomingCount,
+          overdue: dashboardMetrics.overdueCount,
+          upcoming: dashboardMetrics.upcomingCount,
         },
       },
     });
@@ -242,141 +190,88 @@ const staffDashboard = async (req, res) => {
   }
 };
 
-/* ════════════════════════════════════════════════════════════════════════════
-   reports — GET /api/reports
-   ── Supports optional ?from=YYYY-MM-DD&to=YYYY-MM-DD for date filtering ──
-   ════════════════════════════════════════════════════════════════════════════ */
 const reports = async (req, res) => {
   try {
+    const staffId = req.admin?.role === 'staff' ? resolveStaffId(req) : null;
+    const clients = await getScopedClients(staffId);
+    const clientIds = clients.map((client) => client._id);
     const monthStart = startOfMonth();
-    const monthEnd   = endOfMonth();
+    const monthEnd = endOfMonth();
+    const range = toDateRange(req.query.from, req.query.to);
 
-    // ── Parse optional date range from query params ───────────────────────
-    const { from, to } = req.query;
-    let dateFilter = {}; // extra $match conditions when range is provided
-
-    if (from && to) {
-      const fromDate = new Date(from);
-      const toDate   = new Date(to);
-      // Set toDate to end of that day so it's inclusive
-      toDate.setHours(23, 59, 59, 999);
-
-      if (!isNaN(fromDate) && !isNaN(toDate)) {
-        // Filter by repayment due date OR paidDate within the range
-        dateFilter = {
-          $or: [
-            { date:     { $gte: fromDate, $lte: toDate } },
-            { paidDate: { $gte: fromDate, $lte: toDate } },
-          ],
-        };
-      }
-    }
-
-    const baseMatch = { ...notRemoved, ...dateFilter };
-
-    // ── Summary totals ────────────────────────────────────────────────────
-    const [summary] = await Repayment.aggregate([
-      { $match: baseMatch },
-      {
-        $group: {
-          _id: null,
-          totalCollected: { $sum: '$amountPaid' },
-          totalPending:   { $sum: '$balance'    },
-          monthCollected: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $gte: ['$paidDate', monthStart] },
-                  { $lte: ['$paidDate', monthEnd]   },
-                ]},
-                '$amountPaid', 0,
-              ],
+    const [collectionTotals, currentMonthCollections, pendingTotals, currentMonthPending, statusRows, planAnalytics] =
+      await Promise.all([
+        getCollectionTotals({ clientIds, from: range?.fromDate, to: range?.toDate }),
+        getCollectionTotals({ clientIds, from: monthStart, to: monthEnd }),
+        getRepaymentTotals({ clientIds, dueFrom: range?.fromDate, dueTo: range?.toDate }),
+        getRepaymentTotals({ clientIds, dueFrom: monthStart, dueTo: monthEnd }),
+        Repayment.aggregate([
+          { $match: getRepaymentMatch({ clientIds, dueFrom: range?.fromDate, dueTo: range?.toDate }) },
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 },
+              total: { $sum: '$amount' },
+              paid: { $sum: '$amountPaid' },
+              pending: { $sum: '$balance' },
             },
           },
-          monthPending: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $gte: ['$date', monthStart] },
-                  { $lte: ['$date', monthEnd]   },
-                  { $in: ['$status', PENDING_STATUSES] },
-                ]},
-                '$balance', 0,
-              ],
+          { $sort: { count: -1 } },
+        ]),
+        Repayment.aggregate([
+          { $match: getRepaymentMatch({ clientIds, dueFrom: range?.fromDate, dueTo: range?.toDate }) },
+          {
+            $lookup: {
+              from: 'clients',
+              localField: 'client',
+              foreignField: '_id',
+              as: 'clientDoc',
             },
           },
-        },
-      },
-    ]);
+          { $unwind: { path: '$clientDoc', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: { $ifNull: ['$clientDoc.repaymentType', 'Unknown'] },
+              customers: { $addToSet: '$client' },
+              scheduled: { $sum: '$amount' },
+              pending: { $sum: '$balance' },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              planGroup: '$_id',
+              customers: { $size: '$customers' },
+              collected: { $subtract: ['$scheduled', '$pending'] },
+              pending: 1,
+            },
+          },
+          { $sort: { customers: -1 } },
+        ]),
+      ]);
 
-    // ── Status breakdown ──────────────────────────────────────────────────
-    const statusRows = await Repayment.aggregate([
-      { $match: baseMatch },
-      {
-        $group: {
-          _id:   '$status',
-          count: { $sum: 1 },
-          total: { $sum: '$amount'     },
-          paid:  { $sum: '$amountPaid' },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
-
-    const grandTotal      = statusRows.reduce((s, r) => s + r.count, 0);
-    const statusBreakdown = statusRows.map((r) => ({
-      status:     r._id,
-      count:      r.count,
-      total:      r.total,
-      paid:       r.paid,
-      percentage: grandTotal > 0 ? +((r.count / grandTotal) * 100).toFixed(1) : 0,
+    const grandTotal = statusRows.reduce((sum, row) => sum + row.count, 0);
+    const statusBreakdown = statusRows.map((row) => ({
+      status: row._id,
+      count: row.count,
+      total: row.total,
+      paid: row.paid,
+      pending: row.pending,
+      percentage: grandTotal > 0 ? +((row.count / grandTotal) * 100).toFixed(1) : 0,
     }));
-
-    // ── Plan-wise analytics ───────────────────────────────────────────────
-    const planAnalytics = await Repayment.aggregate([
-      { $match: baseMatch },
-      {
-        $lookup: {
-          from:         'clients',
-          localField:   'client',
-          foreignField: '_id',
-          as:           'clientDoc',
-        },
-      },
-      { $unwind: { path: '$clientDoc', preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id:       { $ifNull: ['$clientDoc.repaymentType', 'Unknown'] },
-          customers: { $addToSet: '$client' },
-          collected: { $sum: '$amountPaid' },
-          pending:   { $sum: '$balance'    },
-        },
-      },
-      {
-        $project: {
-          _id:       0,
-          planGroup: '$_id',
-          customers: { $size: '$customers' },
-          collected: 1,
-          pending:   1,
-        },
-      },
-      { $sort: { customers: -1 } },
-    ]);
 
     return res.status(200).json({
       success: true,
       result: {
         collections: {
-          totalCollected: summary?.totalCollected ?? 0,
-          totalPending:   summary?.totalPending   ?? 0,
-          monthCollected: summary?.monthCollected ?? 0,
-          monthPending:   summary?.monthPending   ?? 0,
+          totalCollected: collectionTotals.totalCollected,
+          totalPending: pendingTotals.pendingBalance,
+          monthCollected: currentMonthCollections.totalCollected,
+          monthPending: currentMonthPending.pendingBalance,
         },
         statusBreakdown,
-        planWise:    planAnalytics,
-        // Echo back the date range so the frontend knows what was filtered
-        dateRange: from && to ? { from, to } : null,
+        planWise: planAnalytics,
+        dateRange: range ? { from: req.query.from, to: req.query.to } : null,
       },
     });
   } catch (err) {
@@ -385,106 +280,47 @@ const reports = async (req, res) => {
   }
 };
 
-/* ════════════════════════════════════════════════════════════════════════════
-   performanceSummary — GET /api/dashboard/performance-summary
-   ════════════════════════════════════════════════════════════════════════════ */
 const performanceSummary = async (req, res) => {
   try {
-    const staffId    = req.admin?._id || req.admin?.id || req.adminId;
-    const staffObjId = mongoose.Types.ObjectId.isValid(staffId)
-      ? new mongoose.Types.ObjectId(String(staffId))
-      : null;
-
-    if (!staffObjId)
+    const staffId = resolveStaffId(req);
+    if (!staffId) {
       return res.status(400).json({ success: false, message: 'Invalid staff ID' });
-
-    const monthStart = startOfMonth();
-    const monthEnd   = endOfMonth();
-    const today      = startOfToday();
-    const upcoming   = in7Days();
-
-    const staffClients = await Client.find({
-      removed:  { $ne: true },
-      assigned: staffObjId,
-    }).lean();
-    const clientIds = staffClients.map((c) => c._id);
-
-    let repAgg = {
-      totalCollected: 0, pendingAmount: 0,
-      monthCollected: 0, totalExpected: 0, upcomingCount: 0,
-    };
-
-    if (clientIds.length > 0) {
-      const [r] = await Repayment.aggregate([
-        { $match: { ...notRemoved, client: { $in: clientIds } } },
-        {
-          $group: {
-            _id: null,
-            totalCollected: { $sum: '$amountPaid' },
-            pendingAmount:  { $sum: '$balance'    },
-            totalExpected:  { $sum: '$amount'     },
-            monthCollected: {
-              $sum: {
-                $cond: [
-                  { $and: [
-                    { $gte: ['$paidDate', monthStart] },
-                    { $lte: ['$paidDate', monthEnd]   },
-                  ]},
-                  '$amountPaid', 0,
-                ],
-              },
-            },
-            upcomingCount: {
-              $sum: {
-                $cond: [
-                  { $and: [
-                    { $gte: ['$date', today]   },
-                    { $lte: ['$date', upcoming] },
-                    { $in:  ['$status', PENDING_STATUSES] },
-                  ]},
-                  1, 0,
-                ],
-              },
-            },
-          },
-        },
-      ]);
-      if (r) repAgg = r;
     }
 
-    const efficiency = repAgg.totalExpected > 0
-      ? +((repAgg.totalCollected / repAgg.totalExpected) * 100).toFixed(1)
-      : 0;
+    const clients = await getScopedClients(staffId);
+    const clientIds = clients.map((client) => client._id);
+
+    const [dashboardMetrics, customerMetrics] = await Promise.all([
+      getDashboardPayload({ clientIds }),
+      getCustomerSummaryForClients(clients),
+    ]);
 
     const efficiencyLabel =
-      efficiency >= 90 ? 'Excellent'        :
-      efficiency >= 70 ? 'Good'             :
-      efficiency >= 50 ? 'Average'          : 'Needs Improvement';
+      dashboardMetrics.efficiency >= 90 ? 'Excellent' :
+      dashboardMetrics.efficiency >= 70 ? 'Good' :
+      dashboardMetrics.efficiency >= 50 ? 'Average' :
+      'Needs Improvement';
 
     return res.status(200).json({
       success: true,
       result: {
-        totalCollected:  repAgg.totalCollected,
-        pendingAmount:   repAgg.pendingAmount,
-        monthCollected:  repAgg.monthCollected,
-        efficiency,
+        totalCollected: dashboardMetrics.totalCollected,
+        pendingAmount: dashboardMetrics.pendingAmount,
+        monthCollected: dashboardMetrics.monthCollected,
+        efficiency: dashboardMetrics.efficiency,
         efficiencyLabel,
-        activeCustomers: staffClients.filter((c) => c.status === 'active').length,
-        fullyPaid:       staffClients.filter((c) => c.status === 'completed').length,
-        defaultedCount:  staffClients.filter((c) => c.status === 'defaulted').length,
-        upcomingCount:   repAgg.upcomingCount,
+        activeCustomers: customerMetrics.active,
+        fullyPaid: customerMetrics.completed,
+        defaultedCount: customerMetrics.defaulted,
+        upcomingCount: dashboardMetrics.upcomingCount,
         collections: {
-          totalCollected: repAgg.totalCollected,
-          totalPending:   repAgg.pendingAmount,
-          monthCollected: repAgg.monthCollected,
+          totalCollected: dashboardMetrics.totalCollected,
+          totalPending: dashboardMetrics.pendingAmount,
+          monthCollected: dashboardMetrics.monthCollected,
         },
-        customerMetrics: {
-          active:    staffClients.filter((c) => c.status === 'active').length,
-          completed: staffClients.filter((c) => c.status === 'completed').length,
-          defaulted: staffClients.filter((c) => c.status === 'defaulted').length,
-        },
-        installments: { upcoming: repAgg.upcomingCount },
-        performance:  { efficiency },
+        customerMetrics,
+        installments: { upcoming: dashboardMetrics.upcomingCount },
+        performance: { efficiency: dashboardMetrics.efficiency },
       },
     });
   } catch (err) {
@@ -500,11 +336,12 @@ const dashboardSummary = async (req, res) => {
       {
         $group: {
           _id: null,
-          totalGiven:   { $sum: '$amount'  },
+          totalGiven: { $sum: '$amount' },
           totalPending: { $sum: '$balance' },
         },
       },
     ]);
+
     return res.status(200).json({
       success: true,
       result: summary || { totalGiven: 0, totalPending: 0 },
@@ -515,4 +352,10 @@ const dashboardSummary = async (req, res) => {
   }
 };
 
-module.exports = { adminDashboard, staffDashboard, reports, performanceSummary, dashboardSummary };
+module.exports = {
+  adminDashboard,
+  staffDashboard,
+  reports,
+  performanceSummary,
+  dashboardSummary,
+};

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import DefaultLayout from '../DefaultLayout';
 import SidePanel from '@/components/SidePanel';
-import { Layout } from 'antd';
+import { Layout, Grid } from 'antd';
 import { useCrudContext } from '@/context/crud';
 
 const { Content } = Layout;
+const { useBreakpoint } = Grid;
 
 const ContentBox = ({ children }) => {
+  const screens = useBreakpoint();
   const { state: stateCrud } = useCrudContext();
   const { isPanelClose }     = stateCrud;
   const [isSidePanelClose, setSidePanel] = useState(isPanelClose);
@@ -24,7 +26,7 @@ const ContentBox = ({ children }) => {
   return (
     <Content
       className="whiteBox shadow layoutPadding"
-      style={{ margin: '30px auto', width: '100%', maxWidth: '100%', flex: 'none' }}
+      style={{ margin: screens.md ? '30px auto' : '10px', width: '100%', maxWidth: '100%', flex: 'none' }}
     >
       {children}
     </Content>

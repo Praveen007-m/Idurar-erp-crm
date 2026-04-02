@@ -10,7 +10,7 @@ import Loading from '@/components/Loading';
 export default function CreateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
   const dispatch = useDispatch();
-  const { isLoading, isSuccess } = useSelector(selectCreatedItem);
+  const { result: createdResult, isLoading, isSuccess } = useSelector(selectCreatedItem);
   const { crudContextAction } = useCrudContext();
   const { panel, collapsedBox, readBox } = crudContextAction;
   const [form] = Form.useForm();
@@ -44,6 +44,14 @@ export default function CreateForm({ config, formElements, withUpload = false, o
 
   useEffect(() => {
     if (isSuccess) {
+      // Ensure the read panel uses the latest entity data (including assigned staff and computed values)
+      if (createdResult && createdResult._id) {
+        dispatch(crud.currentItem({ data: createdResult }));
+
+        // Re-read from server to ensure relational fields are fully populated (e.g., assigned staff name)
+        dispatch(crud.read({ entity, id: createdResult._id }));
+      }
+
       dispatch(crud.list({ entity }));
 
       if (config.closePanelOnSuccess) {
@@ -60,7 +68,7 @@ export default function CreateForm({ config, formElements, withUpload = false, o
 
       dispatch(crud.resetAction({ actionType: 'create' }));
     }
-  }, [isSuccess]);
+  }, [isSuccess, createdResult]);
 
   return (
     <Loading isLoading={isLoading}>

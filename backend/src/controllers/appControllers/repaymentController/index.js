@@ -5,6 +5,7 @@ const { calculateStatus, computeBalance } = require('@/models/appModels/Repaymen
 const getRepaymentDisplayStatus = require('@/utils/getRepaymentDisplayStatus');
 const Payment = require('@/models/appModels/Payment');
 const Setting = require('@/models/coreModels/Setting');
+const { buildInstallmentSchedule, roundCurrency } = require('@/utils/installmentSchedule');
 
 function modelController() {
   const Model = mongoose.model('Repayment');
@@ -79,6 +80,11 @@ function modelController() {
   };
 
   const syncRepaymentPayment = async ({ repayment, previousRepayment = null, repaymentData, adminId }) => {
+    if (!repayment?._id) {
+      console.warn('[repaymentController.syncRepaymentPayment] skipped: missing repayment document');
+      return null;
+    }
+
     const totalAmountPaid  = normalizeNumber(repaymentData.amountPaid ?? repayment.amountPaid);
     const previousAmountPaid = normalizeNumber(previousRepayment?.amountPaid);
     const receivedAmount   = Math.max(
@@ -95,7 +101,7 @@ function modelController() {
     // After Model.create(), repayment.client may be a raw ObjectId or a populated doc.
     // Using mongoose-autopopulate it could also be the full document.
     // We normalise to a plain ObjectId string first, then cast.
-    const rawClient = repayment.client;
+    const rawClient = repayment?.client;
     let clientId;
     if (rawClient && typeof rawClient === 'object' && rawClient._id) {
       // populated document
@@ -289,8 +295,9 @@ function modelController() {
       createPayload.createdBy = req.admin._id;  // ← ADD THIS LINE
       const createData = updatePaymentStatus(createPayload);
       const createdDoc = await Model.create(createData);
-      
-      const result = await Model.findById(createdDoc._id).populate('client').exec();
+
+      const result =
+        (await Model.findById(createdDoc._id).populate('client').exec()) || createdDoc;
 
       // syncRepaymentPayment now handles null/undefined client safely
       await syncRepaymentPayment({
@@ -527,25 +534,35 @@ function modelController() {
           return res.status(404).json({ success: false, result: null, message: 'Client not found' });
         }
 
-        const principal  = Number(client.loanAmount   || 0);
-        const rate       = Number(client.interestRate || 0) / 100;
-        const term       = parseInt(client.term       || 0);
-        let installmentAmount = 0;
-        if (principal > 0 && term > 0 && rate >= 0) {
-          installmentAmount = principal / term + (principal * rate / term);
-        } else {
-          installmentAmount = term > 0 ? principal / term : 0;
+        const normalizedDate = start.toISOString().split('T')[0];
+        const schedule = buildInstallmentSchedule({
+          clientId: client._id,
+          loanAmount: client.loanAmount,
+          interestRate: client.interestRate,
+          term: client.term,
+          startDate: client.startDate,
+          repaymentType: client.repaymentType,
+          interestType: client.interestType,
+          createdBy: client.createdBy,
+        });
+
+        const scheduleEntry =
+          schedule.find((item) => item.date?.toISOString().split('T')[0] === normalizedDate) ||
+          schedule[0];
+
+        if (!scheduleEntry) {
+          return res.status(404).json({ success: false, result: null, message: 'No repayment schedule found for client' });
         }
 
         repayment = {
           _id:        null,
           client,
           date:       start,
-          amount:     Math.round(installmentAmount * 100) / 100,
-          principal:  Math.round((principal / term) * 100) / 100,
-          interest:   Math.round((installmentAmount - principal / term) * 100) / 100,
+          amount:     roundCurrency(scheduleEntry.amount),
+          principal:  roundCurrency(scheduleEntry.principal),
+          interest:   roundCurrency(scheduleEntry.interest),
           amountPaid: 0,
-          balance:    Math.round(installmentAmount * 100) / 100,
+          balance:    roundCurrency(scheduleEntry.amount),
           status:     'not_started',
           isVirtual:  true,
           notes:      `Virtual installment for ${client.name}`,

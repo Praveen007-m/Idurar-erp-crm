@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Row, Col } from 'antd';
 import { useSelector } from 'react-redux';
 
@@ -14,44 +14,97 @@ import { useDate } from '@/settings';
 
 export default function ReadItem({ config }) {
   const { dateFormat } = useDate();
-  let { readColumns, fields } = config;
   const translate = useLanguage();
   const { result: currentResult } = useSelector(selectCurrentItem);
   const { state } = useCrudContext();
   const { isReadBoxOpen } = state;
   const [listState, setListState] = useState([]);
 
-  if (fields) readColumns = [...dataForRead({ fields: fields, translate: translate })];
+  const configSafe = config || {};
+  const fields = configSafe.fields || [];
+  const readColumnsFromConfig = Array.isArray(configSafe.readColumns) ? configSafe.readColumns : [];
+
+  const readColumns = useMemo(() => {
+    return fields.length ? dataForRead({ fields, translate }) : readColumnsFromConfig;
+  }, [fields, readColumnsFromConfig, translate]);
+
+  const excludedKeys = ['paymentDetails', 'startDate', 'endDate', 'enabled', 'created', 'updated', '__v', '_id', 'removed'];
+
+  const formatLabel = (key) => {
+    if (!key) return '';
+    const humanized = key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .trim();
+    return humanized.charAt(0).toUpperCase() + humanized.slice(1).toLowerCase();
+  };
+
+  const formatValue = (value) => {
+    if (value === undefined || value === null || value === '') return '—';
+    if (typeof value === 'object') {
+      if (value.name || value.email || value.label) {
+        return value.name || value.email || value.label || '—';
+      }
+      return Array.isArray(value) ? value.join(', ') : JSON.stringify(value);
+    }
+    return value;
+  };
+
   useEffect(() => {
-    const list = [];
-    readColumns.map((props) => {
-      const propsKey = props.dataIndex;
-      const propsTitle = props.title;
-      const isDate = props.isDate || false;
-      let value = valueByString(currentResult, propsKey);
-      value = isDate ? dayjs(value).format(dateFormat) : value;
-      list.push({ propsKey, label: propsTitle, value: value });
+    let list = [];
+
+    if (Array.isArray(readColumns) && readColumns.length > 0) {
+      list = readColumns
+        .filter((props) => !excludedKeys.includes(props?.dataIndex || ''))
+        .map((props) => {
+          const propsKey = props?.dataIndex || '';
+          const propsTitle = props?.title || formatLabel(propsKey);
+          const isDate = props?.isDate || false;
+          const rawValue = valueByString(currentResult || {}, propsKey);
+          let value = rawValue;
+
+          if (typeof props?.render === 'function') {
+            value = props.render(rawValue, currentResult || {});
+          } else if (isDate) {
+            value = rawValue ? dayjs(rawValue).format(dateFormat) : '—';
+          }
+
+          return { propsKey, label: formatLabel(propsTitle), value: formatValue(value) };
+        });
+    }
+
+    if ((!Array.isArray(readColumns) || readColumns.length === 0) && currentResult && typeof currentResult === 'object') {
+      list = Object.keys(currentResult)
+        .filter((key) => !excludedKeys.includes(key))
+        .map((key) => {
+          const displayValue = formatValue(currentResult[key]);
+          return { propsKey: key, label: formatLabel(key), value: displayValue };
+        });
+    }
+
+    setListState((prevListState) => {
+      const isEqual = prevListState.length === list.length && prevListState.every((item, index) => item.propsKey === list[index].propsKey && item.value === list[index].value);
+      return isEqual ? prevListState : list;
     });
-    setListState(list);
-  }, [currentResult]);
+  }, [currentResult, dateFormat, readColumns]);
 
-  const show = isReadBoxOpen ? { display: 'block', opacity: 1 } : { display: 'none', opacity: 0 };
+  if (!isReadBoxOpen || listState.length === 0) {
+    return null;
+  }
 
-  const itemsList = listState.map((item) => {
-    return (
-      <Row key={item.propsKey} gutter={12}>
-        <Col className="gutter-row" span={8}>
-          <p>{item.label}</p>
-        </Col>
-        <Col className="gutter-row" span={2}>
-          <p> : </p>
-        </Col>
-        <Col className="gutter-row" span={14}>
-          <p>{item.value}</p>
-        </Col>
-      </Row>
-    );
-  });
+  const itemsList = listState.map((item) => (
+    <Row key={item.propsKey || Math.random()} gutter={12}>
+      <Col className="gutter-row" span={8}>
+        <p>{item.label}</p>
+      </Col>
+      <Col className="gutter-row" span={2}>
+        <p> : </p>
+      </Col>
+      <Col className="gutter-row" span={14}>
+        <p>{item.value}</p>
+      </Col>
+    </Row>
+  ));
 
-  return <div style={show}>{itemsList}</div>;
+  return <div>{itemsList}</div>;
 }

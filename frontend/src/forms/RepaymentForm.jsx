@@ -6,7 +6,7 @@
  */
 import {
   Form, Input, InputNumber, Select, DatePicker,
-  Row, Col, Button, Tag,
+  Row, Col, Button, Tag, Grid,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useCallback } from 'react';
@@ -53,6 +53,8 @@ export default function RepaymentForm({ isUpdateForm = false }) {
   const { dateFormat } = useDate();
   const { TextArea }   = Input;
   const form           = Form.useFormInstance();
+  const screens        = Grid.useBreakpoint();
+  const isMobile       = !screens.sm;
 
   const amount            = Form.useWatch('amount',            form);
   const status            = Form.useWatch('status',            form);
@@ -141,7 +143,7 @@ export default function RepaymentForm({ isUpdateForm = false }) {
     <>
       {/* Current status badge */}
       {isUpdateForm && normalizedStatus && (
-        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ color: '#8c8c8c', fontSize: 13 }}>Current Status:</span>
           <Tag color={STATUS_COLOR[normalizedStatus] || 'default'} style={{ borderRadius: 12, fontSize: 13, margin: 0 }}>
             {STATUS_OPTIONS.find(o => o.value === normalizedStatus)?.label || normalizedStatus}
@@ -222,7 +224,7 @@ export default function RepaymentForm({ isUpdateForm = false }) {
 
       {/* ── PRINCIPAL + INTEREST ────────────────────────────────────────────── */}
       <Row gutter={[12, 0]}>
-        <Col xs={12}>
+        <Col xs={24} sm={12}>
           <Form.Item label={translate('Principal')} name="principal">
             {isUpdateForm ? (
               <div style={{ pointerEvents: 'none' }}>
@@ -238,7 +240,7 @@ export default function RepaymentForm({ isUpdateForm = false }) {
             )}
           </Form.Item>
         </Col>
-        <Col xs={12}>
+        <Col xs={24} sm={12}>
           <Form.Item label={translate('Interest')} name="interest">
             {isUpdateForm ? (
               <div style={{ pointerEvents: 'none' }}>
@@ -284,8 +286,8 @@ export default function RepaymentForm({ isUpdateForm = false }) {
               />
             </Form.Item>
           ) : (
-            <Row gutter={[12, 0]} align="middle">
-              <Col xs={24} sm={8}>
+            <Row gutter={[12, 0]} align="top">
+              <Col xs={24} sm={9}>
                 {/* Amount Paid — read-only, white, normal-looking */}
                 <Form.Item label={translate('Amount Paid')} name="amountPaid">
                   <div style={{ pointerEvents: 'none' }}>
@@ -298,7 +300,7 @@ export default function RepaymentForm({ isUpdateForm = false }) {
                   </div>
                 </Form.Item>
               </Col>
-              <Col xs={16} sm={10}>
+              <Col xs={24} sm={9}>
                 <Form.Item label={translate('Additional Payment')} name="additionalPayment">
                   <InputNumber
                     min={0}
@@ -308,13 +310,14 @@ export default function RepaymentForm({ isUpdateForm = false }) {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={8} sm={6} style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <Form.Item style={{ marginBottom: 24, width: '100%' }}>
+              <Col xs={24} sm={6}>
+                <Form.Item label=" " style={{ width: '100%' }}>
                   <Button
                     type="primary"
                     onClick={handlePartialPayment}
                     disabled={!additionalPayment || addPayment <= 0}
                     block
+                    style={{ minHeight: isMobile ? 42 : undefined }}
                   >
                     {translate('Pay')}
                   </Button>

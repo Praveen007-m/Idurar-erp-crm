@@ -10,10 +10,10 @@ const deriveClientStatus = async (clientId) => {
   const total = repayments.length;
   if (total === 0) return 'not_started';
   
-  const paid = repayments.filter(r => r.status === 'paid').length;
-  const overdue = repayments.some(r => ['default', 'late'].includes(r.status));
+  const settled = repayments.filter(r => ['paid', 'late'].includes(r.status)).length;
+  const overdue = repayments.some(r => r.status === 'default');
   
-  if (paid === total) return 'completed';
+  if (settled === total) return 'paid';
   if (overdue) return 'defaulted';
   return 'active';
 };

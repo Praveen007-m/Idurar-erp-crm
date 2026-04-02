@@ -54,13 +54,23 @@ export default function SidePanel({ config, topContent, bottomContent, fixHeader
     collapsedBox.collapse();
   };
 
+  const drawerWidth = screens.md ? 450 : '95%';
+
   return (
     <Drawer
       title={config.PANEL_TITLE}
       placement="right"
-      onClose={collapsePanel}
+      onClose={() => {
+        collapsePanel();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) active.blur();
+      }}
       open={!isPanelClose}
-      width={450}
+      width={drawerWidth}
+      destroyOnClose
+      focusTriggerAfterClose={false}
+      autoFocus={false}
+      maskClosable={true}
     >
       <div
         className="sidePanelContent"

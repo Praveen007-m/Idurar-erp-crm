@@ -95,11 +95,28 @@ export const fields = {
     relation: 'Admin',
     label: 'Assigned Staff',
     render: (text, record) => {
-      // Handle populated assigned staff object
-      if (record.assigned && typeof record.assigned === 'object') {
-        return record.assigned.name || record.assigned.email || 'Unknown Staff';
+      const assigned = record?.assigned || record?.assignedTo || null;
+      if (!assigned) {
+        return 'Unknown Staff';
       }
-      // Handle null or undefined or raw ObjectId strings
+
+      if (typeof assigned === 'string') {
+        return assigned;
+      }
+
+      if (typeof assigned === 'object') {
+        if (assigned.name || assigned.email || assigned._id) {
+          return assigned.name || assigned.email || assigned._id;
+        }
+
+        const nested = assigned?.assigned || assigned?.user || assigned?.staff;
+        if (nested && typeof nested === 'object') {
+          return nested.name || nested.email || nested._id || 'Unknown Staff';
+        }
+
+        return JSON.stringify(assigned);
+      }
+
       return 'Unknown Staff';
     },
   },

@@ -44,7 +44,7 @@ export default function AdminDashboardModule() {
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               borderRadius: 12 
             }}
-            bodyStyle={{ padding: '40px 20px' }}
+            styles={{ body: { padding: '40px 20px' } }}
           >
             <Statistic
               title="TOTAL GIVEN"
@@ -70,7 +70,7 @@ export default function AdminDashboardModule() {
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               borderRadius: 12 
             }}
-            bodyStyle={{ padding: '40px 20px' }}
+            styles={{ body: { padding: '40px 20px' } }}
           >
             <Statistic
               title="TOTAL PENDING"
