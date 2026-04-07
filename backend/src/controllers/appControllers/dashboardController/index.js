@@ -7,6 +7,7 @@ const {
   getClientStatusSummary,
   getRepaymentMatch,
 } = require('@/utils/repaymentMetrics');
+const { getComputedStatusExpression } = require('@/utils/repaymentStatus');
 
 const startOfMonth = () => {
   const d = new Date();
@@ -207,9 +208,10 @@ const reports = async (req, res) => {
         getRepaymentTotals({ clientIds, dueFrom: monthStart, dueTo: monthEnd }),
         Repayment.aggregate([
           { $match: getRepaymentMatch({ clientIds, dueFrom: range?.fromDate, dueTo: range?.toDate }) },
+          { $addFields: { computedStatus: getComputedStatusExpression(startOfToday()) } },
           {
             $group: {
-              _id: '$status',
+              _id: '$computedStatus',
               count: { $sum: 1 },
               total: { $sum: '$amount' },
               paid: { $sum: '$amountPaid' },

@@ -20,12 +20,31 @@ const DefaultApp = () => (
   </Localization>
 );
 
+const getStoredToken = () => {
+  const token = localStorage.getItem('token');
+  if (!token || typeof token !== 'string') return null;
+
+  const parts = token.split('.');
+  const isValid = parts.length === 3 && parts.every((part) => part.length > 0);
+  if (!isValid) {
+    localStorage.removeItem('token');
+    return null;
+  }
+
+  return token;
+};
+
 export default function IdurarOs() {
   const { isLoggedIn } = useSelector(selectAuth);
+  const storedToken = getStoredToken();
+  const userHasToken = Boolean(storedToken);
+  const isAuthenticated = userHasToken;
 
-  console.log(
-    '🚀 Welcome to Webaac Solutions Finance Management.'
-  );
+  if (isLoggedIn && !userHasToken) {
+    console.warn('Auth state is logged in but no valid token found; forcing unauthenticated mode.');
+  }
+
+  console.log('🚀 Welcome to Webaac Solutions Finance Management.');
 
   // // Online state
   // const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -61,7 +80,7 @@ export default function IdurarOs() {
   //   };
   // }, [navigator.onLine]);
 
-  if (!isLoggedIn)
+  if (!isAuthenticated)
     return (
       <Localization>
         <AuthRouter />

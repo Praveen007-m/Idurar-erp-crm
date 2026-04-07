@@ -33,31 +33,31 @@ const errorHandler = (error) => {
   }
 
   if (response && response.data && response.data.jwtExpired) {
-    const result = window.localStorage.getItem('auth');
-    const jsonFile = window.localStorage.getItem('isLogout');
-    const { isLogout } = (jsonFile && JSON.parse(jsonFile)) || false;
-    window.localStorage.removeItem('auth');
-    window.localStorage.removeItem('isLogout');
-    if (result || isLogout) {
-      window.location.href = '/logout';
-    }
+    console.log('JWT expired received; not auto-logging out');
+    const message = response.data.message || 'Session expired';
+    notification.error({
+      message: 'Session expired',
+      description: message,
+    });
+    return response.data;
   }
 
   if (response && response.status) {
     const message = response.data && response.data.message;
 
     const errorText = message || codeMessage[response.status];
-    const { status, error } = response;
+    const { status } = response;
     notification.error({
       message: `Request error ${status}`,
       description: errorText,
     });
 
     if (response?.data?.error?.name === 'JsonWebTokenError') {
-      window.localStorage.removeItem('auth');
-      window.localStorage.removeItem('isLogout');
-      window.location.href = '/logout';
-    } else return response.data;
+      console.log('JWT error received; not auto-logging out');
+      return response.data;
+    }
+
+    return response.data;
   } else {
 
     if (navigator.onLine) {

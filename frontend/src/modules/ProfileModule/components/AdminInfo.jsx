@@ -4,9 +4,10 @@ import { generate as uniqueId } from 'shortid';
 import { EditOutlined, LockOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Avatar, Button, Col, Descriptions, Divider, Row } from 'antd';
 import { PageHeader } from '@ant-design/pro-layout';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { useNavigate } from 'react-router-dom';
+import { logout as logoutAction } from '@/redux/auth/actions';
 
 import { selectCurrentAdmin } from '@/redux/auth/selectors';
 
@@ -16,10 +17,17 @@ import { FILE_BASE_URL } from '@/config/serverApiConfig';
 const AdminInfo = ({ config }) => {
   const translate = useLanguage();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { profileContextAction } = useProfileContext();
   const { modal, updatePanel } = profileContextAction;
   const { ENTITY_NAME } = config;
   const currentAdmin = useSelector(selectCurrentAdmin);
+
+  const handleLogout = () => {
+    console.log('LOGOUT TRIGGERED');
+    dispatch(logoutAction());
+    navigate('/login');
+  };
 
   return (
     <>
@@ -87,7 +95,7 @@ const AdminInfo = ({ config }) => {
         key={`${uniqueId()}`}
         icon={<LogoutOutlined />}
         className="right"
-        onClick={() => navigate('/logout')}
+        onClick={handleLogout}
       >
         {translate('Logout')}
       </Button>

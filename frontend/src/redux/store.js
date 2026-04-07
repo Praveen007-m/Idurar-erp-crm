@@ -9,6 +9,7 @@ import storePersist from './storePersist';
 
 const AUTH_INITIAL_STATE = {
   current: {},
+  token: null,
   isLoggedIn: false,
   isLoading: false,
   isSuccess: false,

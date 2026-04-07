@@ -206,12 +206,13 @@
 // //  );
 
 
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, Dropdown, Layout, Button } from 'antd';
 
 import { LogoutOutlined, ToolOutlined, UserOutlined, MenuOutlined } from '@ant-design/icons';
 
+import { logout as logoutAction } from '@/redux/auth/actions';
 import { selectCurrentAdmin } from '@/redux/auth/selectors';
 import { selectCompanySettings } from '@/redux/settings/selectors';
 import { FILE_BASE_URL } from '@/config/serverApiConfig';
@@ -231,6 +232,8 @@ export default function HeaderContent() {
   const { appContextAction } = useAppContext();
   const { navMenu }          = appContextAction;
 
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const translate = useLanguage();
 
   // Dynamic company name + logo — fall back to defaults if not saved yet
@@ -240,6 +243,12 @@ export default function HeaderContent() {
     : logoIcon;
 
   const handleMenuToggle = () => navMenu.toggle();
+
+  const handleLogout = () => {
+    console.log('LOGOUT TRIGGERED');
+    dispatch(logoutAction());
+    navigate('/login');
+  };
 
   const ProfileDropdown = () => {
     const navigate = useNavigate();
@@ -287,7 +296,14 @@ export default function HeaderContent() {
     {
       icon:  <LogoutOutlined />,
       key:   'logout',
-      label: <Link to="/logout">{translate('logout')}</Link>,
+      label: (
+        <span
+          onClick={handleLogout}
+          style={{ cursor: 'pointer', display: 'inline-block' }}
+        >
+          {translate('logout')}
+        </span>
+      ),
     },
   ];
 

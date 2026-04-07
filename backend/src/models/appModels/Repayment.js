@@ -32,25 +32,29 @@ const computeStatus = (doc = {}) => {
   today.setHours(0, 0, 0, 0);
   dueDate.setHours(0, 0, 0, 0);
 
-  if (paidAmount >= totalAmount && totalAmount > 0) {
+  if (totalAmount > 0 && paidAmount >= totalAmount) {
     if (paymentDate) {
       const normalizedPaymentDate = new Date(paymentDate);
       normalizedPaymentDate.setHours(0, 0, 0, 0);
-
       if (normalizedPaymentDate > dueDate) {
         return 'late';
       }
     }
-
     return 'paid';
   }
 
-  if (paidAmount > 0) {
+  if (paidAmount > 0 && paidAmount < totalAmount) {
+    if (dueDate < today) {
+      return 'late';
+    }
     return 'partial';
   }
 
-  if (today > dueDate) {
-    return 'default';
+  if (paidAmount === 0) {
+    if (dueDate < today) {
+      return 'default';
+    }
+    return 'not_started';
   }
 
   return 'not_started';

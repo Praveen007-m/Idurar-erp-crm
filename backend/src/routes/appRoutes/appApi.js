@@ -15,6 +15,7 @@ const Client    = require('@/models/appModels/Client');
 const Admin     = require('@/models/coreModels/Admin');
 const Repayment = require('@/models/appModels/Repayment');
 const Payment = require('@/models/appModels/Payment');
+const { startOfToday, getComputedStatusExpression } = require('@/utils/repaymentStatus');
 
 // ── Safe match helper ─────────────────────────────────────────────────────────
 // Handles documents where 'removed' field may or may not exist in MongoDB
@@ -87,6 +88,7 @@ router.route('/staff/performance')
     clientAgg.forEach((row) => { clientMap[row._id.toString()] = row; });
 
     // 3. Aggregate repayments per staff via Client.assigned
+    const today = startOfToday();
     const repaymentAgg = await Repayment.aggregate([
       {
         $lookup: {
@@ -104,13 +106,18 @@ router.route('/staff/performance')
         },
       },
       {
+        $addFields: {
+          computedStatus: getComputedStatusExpression(today),
+        },
+      },
+      {
         $group: {
           _id: '$clientDoc.assigned',
           totalPending: {
             $sum: { $ifNull: ['$balance', 0] },
           },
           overdueCount: {
-            $sum: { $cond: [{ $in: ['$status', ['default', 'late', 'DEFAULT', 'LATE']] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$computedStatus', ['default', 'late']] }, 1, 0] },
           },
           totalRepayments: { $sum: 1 },
         },

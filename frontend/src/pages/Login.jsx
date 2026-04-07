@@ -26,15 +26,14 @@ const LoginPage = () => {
   };
 
   useEffect(() => {
-    if (isSuccess && currentAdmin) {
-      // Redirect based on role: staff goes to /customer, others go to /
-      if (currentAdmin.role === 'staff') {
-        navigate('/customer');
-      } else {
-        navigate('/');
-      }
+    const token = localStorage.getItem('token');
+    console.log('LOGIN TOKEN:', token);
+    console.log('STORED TOKEN:', localStorage.getItem('token'));
+
+    if (isSuccess && token) {
+      navigate('/dashboard');
     }
-  }, [isSuccess, currentAdmin, navigate]);
+  }, [navigate, isSuccess]);
 
   const FormContainer = () => {
     return (

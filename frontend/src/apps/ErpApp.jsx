@@ -27,9 +27,9 @@ export default function ErpCrmApp() {
     dispatch(settingsAction.list({ entity: 'setting' }));
   }, []);
 
-  const { isSuccess: settingIsloaded } = useSelector(selectSettings);
+  const { isSuccess: settingIsloaded, isLoading: settingIsLoading } = useSelector(selectSettings);
 
-  if (settingIsloaded)
+  if (settingIsloaded || !settingIsLoading)
     return (
       <Layout hasSider style={{ minHeight: '100vh' }}>
         <Navigation />

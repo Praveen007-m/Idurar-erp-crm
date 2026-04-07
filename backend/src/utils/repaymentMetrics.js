@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const Payment = require('@/models/appModels/Payment');
 const Repayment = require('@/models/appModels/Repayment');
+const { startOfToday, getComputedStatusExpression } = require('@/utils/repaymentStatus');
 
 const toObjectIds = (ids = []) =>
   ids
@@ -62,8 +63,17 @@ const getCollectionTotals = async ({ clientIds, from, to } = {}) => {
 };
 
 const getRepaymentTotals = async ({ clientIds, dueFrom, dueTo, today, upcoming } = {}) => {
+  const effectiveToday = today ? new Date(today) : startOfToday();
+  const todayFloor = new Date(effectiveToday);
+  todayFloor.setHours(0, 0, 0, 0);
+
   const [row] = await Repayment.aggregate([
     { $match: getRepaymentMatch({ clientIds, dueFrom, dueTo }) },
+    {
+      $addFields: {
+        computedStatus: getComputedStatusExpression(todayFloor),
+      },
+    },
     {
       $group: {
         _id: null,
@@ -72,7 +82,7 @@ const getRepaymentTotals = async ({ clientIds, dueFrom, dueTo, today, upcoming }
         totalRepayments: { $sum: 1 },
         overdueCount: {
           $sum: {
-            $cond: [{ $in: ['$status', ['default', 'late', 'DEFAULT', 'LATE']] }, 1, 0],
+            $cond: [{ $in: ['$computedStatus', ['default', 'late']] }, 1, 0],
           },
         },
         upcomingCount: {
@@ -80,9 +90,9 @@ const getRepaymentTotals = async ({ clientIds, dueFrom, dueTo, today, upcoming }
             $cond: [
               {
                 $and: [
-                  ...(today ? [{ $gte: ['$date', today] }] : []),
+                  ...(todayFloor ? [{ $gte: ['$date', todayFloor] }] : []),
                   ...(upcoming ? [{ $lte: ['$date', upcoming] }] : []),
-                  { $in: ['$status', ['not_started', 'partial', 'NOT_STARTED', 'PARTIAL']] },
+                  { $in: ['$computedStatus', ['not_started', 'partial']] },
                 ],
               },
               1,
@@ -109,8 +119,15 @@ const getClientStatusSummary = async ({ clientIds } = {}) => {
     return { total: 0, active: 0, completed: 0, defaulted: 0 };
   }
 
+  const todayFloor = startOfToday();
+
   const repaymentRows = await Repayment.aggregate([
     { $match: getRepaymentMatch({ clientIds: normalizedIds }) },
+    {
+      $addFields: {
+        computedStatus: getComputedStatusExpression(todayFloor),
+      },
+    },
     {
       $group: {
         _id: '$client',
@@ -122,7 +139,7 @@ const getClientStatusSummary = async ({ clientIds } = {}) => {
         },
         defaultRepayments: {
           $sum: {
-            $cond: [{ $eq: ['$status', 'default'] }, 1, 0],
+            $cond: [{ $eq: ['$computedStatus', 'default'] }, 1, 0],
           },
         },
       },

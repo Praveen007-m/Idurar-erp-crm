@@ -1,43 +1,35 @@
-import { Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { selectCurrentAdmin } from '@/redux/auth/selectors';
+import { Navigate, Outlet } from 'react-router-dom';
+
+const normalizeToken = (rawToken) => {
+  if (typeof rawToken !== 'string') return null;
+  let token = rawToken.trim();
+  if (token.toLowerCase().startsWith('bearer ')) {
+    token = token.slice(7).trim();
+  }
+  return token || null;
+};
+
+const isValidJwt = (token) => {
+  return typeof token === 'string' && token.split('.').length === 3 && token.split('.').every((part) => part.length > 0);
+};
 
 /**
- * ProtectedRoute component for role-based access control
- * 
- * @param {React.ReactNode} children - The component to render if authorized
- * @param {string[]} allowedRoles - Array of roles that are allowed to access the route
- *                                   If not provided, all authenticated users can access
- * @param {string} redirectPath - Path to redirect to if access is denied (default: '/')
+ * ProtectedRoute component for token-based access control only.
+ * It checks localStorage for a token and does not perform API calls.
  */
-export default function ProtectedRoute({ 
-  children, 
-  allowedRoles, 
-  redirectPath = '/' 
-}) {
-  const currentAdmin = useSelector(selectCurrentAdmin);
-  
-  // If no user is logged in, redirect to login
-  if (!currentAdmin || !currentAdmin._id) {
+export default function ProtectedRoute({ children }) {
+  const rawToken = localStorage.getItem('token');
+  const token = normalizeToken(rawToken);
+  console.log('CHECK TOKEN:', token);
+
+  if (!token || !isValidJwt(token)) {
+    if (rawToken && !isValidJwt(token)) {
+      localStorage.removeItem('token');
+      console.warn('Removed malformed token from localStorage.');
+    }
     return <Navigate to="/login" replace />;
   }
-  
-  // If allowedRoles is specified, check user's role
-  if (allowedRoles && allowedRoles.length > 0) {
-    const userRole = currentAdmin.role;
-    
-    if (!allowedRoles.includes(userRole)) {
-      // User doesn't have the required role
-      // Redirect based on role - staff goes to /customer
-      if (userRole === 'staff') {
-        return <Navigate to="/staff-dashboard" replace />;
-      }
-      // Default redirect for unauthorized access
-      return <Navigate to="/" replace />;
-    }
-  }
-  
-  // User is authorized
-  return children;
+
+  return children ?? <Outlet />;
 }
 

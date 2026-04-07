@@ -97,6 +97,29 @@ const adminDashboard = async (req, res) => {
       },
     ]);
 
+    // Normalize counts by recalculating statuses at query time, so overdues / upcoming matches current repay logic.
+    const allRepayments = await Repayment.find({ ...notRemoved }).lean();
+    const upcomingWindow = in7Days();
+
+    const computedOverdueCount = allRepayments.reduce((count, repayment) => {
+      const status = (typeof Repayment.computeStatus === 'function'
+        ? Repayment.computeStatus(repayment)
+        : repayment.status) || 'not_started';
+      return count + (['default', 'late'].includes(status) ? 1 : 0);
+    }, 0);
+
+    const computedUpcomingCount = allRepayments.reduce((count, repayment) => {
+      const status = (typeof Repayment.computeStatus === 'function'
+        ? Repayment.computeStatus(repayment)
+        : repayment.status) || 'not_started';
+      const dueDate = new Date(repayment.date);
+      dueDate.setHours(0, 0, 0, 0);
+      if (['not_started', 'partial'].includes(status) && dueDate >= today && dueDate <= upcomingWindow) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
     const totalExpected  = repAgg?.totalExpected  ?? 0;
     const totalCollected = repAgg?.totalCollected ?? 0;
     const efficiency     = totalExpected > 0
@@ -115,8 +138,8 @@ const adminDashboard = async (req, res) => {
         totalCollected:  repAgg?.totalCollected  ?? 0,
         pendingAmount:   repAgg?.pendingBalance  ?? 0,
         monthCollected:  repAgg?.monthCollected  ?? 0,
-        overdueCount:    repAgg?.overdueCount    ?? 0,
-        upcomingCount:   repAgg?.upcomingCount   ?? 0,
+        overdueCount:    computedOverdueCount,
+        upcomingCount:   computedUpcomingCount,
         efficiency,
         totalRepayments: repAgg?.totalRepayments ?? 0,
         customerSummary: {
@@ -278,6 +301,26 @@ const staffDashboard = async (req, res) => {
 
     console.log('[staffDashboard] repAgg:', repAgg);
 
+    const staffRepayments = await Repayment.find({ ...notRemoved, client: { $in: clientIds } }).lean();
+    const computedOverdueCount = staffRepayments.reduce((count, repayment) => {
+      const status = (typeof Repayment.computeStatus === 'function'
+        ? Repayment.computeStatus(repayment)
+        : repayment.status) || 'not_started';
+      return count + (['default', 'late'].includes(status) ? 1 : 0);
+    }, 0);
+
+    const computedUpcomingCount = staffRepayments.reduce((count, repayment) => {
+      const status = (typeof Repayment.computeStatus === 'function'
+        ? Repayment.computeStatus(repayment)
+        : repayment.status) || 'not_started';
+      const dueDate = new Date(repayment.date);
+      dueDate.setHours(0, 0, 0, 0);
+      if (['not_started', 'partial'].includes(status) && dueDate >= today && dueDate <= upcoming) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
     const efficiency =
       repAgg.totalExpected > 0
         ? +((repAgg.totalCollected / repAgg.totalExpected) * 100).toFixed(1)
@@ -290,8 +333,8 @@ const staffDashboard = async (req, res) => {
         totalCollected: repAgg.totalCollected,
         pendingAmount: repAgg.pendingBalance,
         monthCollected: repAgg.monthCollected,
-        overdueCount: repAgg.overdueCount,
-        upcomingCount: repAgg.upcomingCount,
+        overdueCount: computedOverdueCount,
+        upcomingCount: computedUpcomingCount,
 
         performance: { efficiency },
 
@@ -309,8 +352,8 @@ const staffDashboard = async (req, res) => {
         },
 
         installments: {
-          overdue: repAgg.overdueCount,
-          upcoming: repAgg.upcomingCount,
+          overdue: computedOverdueCount,
+          upcoming: computedUpcomingCount,
         },
       },
     });
@@ -366,22 +409,29 @@ const reports = async (req, res) => {
     ]);
 
     // Status breakdown
-    const statusRows = await Repayment.aggregate([
-      { $match: { ...notRemoved } },
-      {
-        $group: {
-          _id:   '$status',
-          count: { $sum: 1 },
-          total: { $sum: '$amount'    },
-          paid:  { $sum: '$amountPaid' },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
+    // Use canonical `computeStatus` from the Repayment model so status counts
+    // match the UI `getDisplayStatus` logic (overdue not_started → default).
+    const allRepayments = await Repayment.find({ ...notRemoved }).lean();
+    const statusMap = allRepayments.reduce((acc, repayment) => {
+      const status = (typeof Repayment.computeStatus === 'function'
+        ? Repayment.computeStatus(repayment)
+        : repayment.status || 'not_started') || 'not_started';
+      const key = String(status || 'not_started');
 
-    const grandTotal      = statusRows.reduce((s, r) => s + r.count, 0);
+      if (!acc[key]) {
+        acc[key] = { status: key, count: 0, total: 0, paid: 0 };
+      }
+
+      acc[key].count += 1;
+      acc[key].total += Number(repayment.amount || 0);
+      acc[key].paid  += Number(repayment.amountPaid || 0);
+      return acc;
+    }, {});
+
+    const statusRows = Object.values(statusMap).sort((a, b) => b.count - a.count);
+    const grandTotal  = statusRows.reduce((s, r) => s + r.count, 0);
     const statusBreakdown = statusRows.map((r) => ({
-      status:     r._id,
+      status:     r.status,
       count:      r.count,
       total:      r.total,
       paid:       r.paid,

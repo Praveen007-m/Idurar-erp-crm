@@ -2,6 +2,19 @@ import * as actionTypes from './types';
 import * as authService from '@/auth';
 import { request } from '@/request';
 
+const normalizeToken = (rawToken) => {
+  if (typeof rawToken !== 'string') return null;
+  let token = rawToken.trim();
+  if (token.toLowerCase().startsWith('bearer ')) {
+    token = token.slice(7).trim();
+  }
+  return token || null;
+};
+
+const isValidJwt = (token) => {
+  return typeof token === 'string' && token.split('.').length === 3 && token.split('.').every((part) => part.length > 0);
+};
+
 export const login =
   ({ loginData }) =>
   async (dispatch) => {
@@ -10,7 +23,17 @@ export const login =
     });
     const data = await authService.login({ loginData });
 
+    console.log('LOGIN RESPONSE:', data);
+
     if (data.success === true) {
+      const token = normalizeToken(data.token || data.result?.token);
+      if (!token || !isValidJwt(token)) {
+        console.error('No valid JWT token found in login response; not storing token');
+        localStorage.removeItem('token');
+      } else {
+        localStorage.setItem('token', token);
+        console.log('TOKEN STORED:', localStorage.getItem('token'));
+      }
       const auth_state = {
         current: data.result,
         isLoggedIn: true,
@@ -24,6 +47,7 @@ export const login =
         payload: data.result,
       });
     } else {
+      console.log('Login failed:', data);
       dispatch({
         type: actionTypes.REQUEST_FAILED,
       });
@@ -64,6 +88,14 @@ export const verify =
         isLoading: false,
         isSuccess: true,
       };
+      const token = normalizeToken(data.token);
+      if (!isValidJwt(token)) {
+        console.error('Malformed JWT token received from verify; clearing token storage');
+        localStorage.removeItem('token');
+      } else {
+        localStorage.setItem('token', token);
+        console.log('TOKEN STORED:', localStorage.getItem('token'));
+      }
       window.localStorage.setItem('auth', JSON.stringify(auth_state));
       window.localStorage.removeItem('isLogout');
       dispatch({
@@ -92,6 +124,14 @@ export const resetPassword =
         isLoading: false,
         isSuccess: true,
       };
+      const token = normalizeToken(data.token);
+      if (!isValidJwt(token)) {
+        console.error('Malformed JWT token received from resetPassword; clearing token storage');
+        localStorage.removeItem('token');
+      } else {
+        localStorage.setItem('token', token);
+        console.log('TOKEN STORED:', localStorage.getItem('token'));
+      }
       window.localStorage.setItem('auth', JSON.stringify(auth_state));
       window.localStorage.removeItem('isLogout');
       dispatch({
@@ -105,35 +145,11 @@ export const resetPassword =
     }
   };
 
-export const logout = () => async (dispatch) => {
+export const logout = () => (dispatch) => {
+  localStorage.removeItem('token');
   dispatch({
     type: actionTypes.LOGOUT_SUCCESS,
   });
-  const result = window.localStorage.getItem('auth');
-  const tmpAuth = JSON.parse(result);
-  const settings = window.localStorage.getItem('settings');
-  const tmpSettings = JSON.parse(settings);
-  window.localStorage.removeItem('auth');
-  window.localStorage.removeItem('settings');
-  window.localStorage.setItem('isLogout', JSON.stringify({ isLogout: true }));
-  const data = await authService.logout();
-  if (data.success === false) {
-    const auth_state = {
-      current: tmpAuth,
-      isLoggedIn: true,
-      isLoading: false,
-      isSuccess: true,
-    };
-    window.localStorage.setItem('auth', JSON.stringify(auth_state));
-    window.localStorage.setItem('settings', JSON.stringify(tmpSettings));
-    window.localStorage.removeItem('isLogout');
-    dispatch({
-      type: actionTypes.LOGOUT_FAILED,
-      payload: data.result,
-    });
-  } else {
-    // on lgout success
-  }
 };
 
 export const updateProfile =

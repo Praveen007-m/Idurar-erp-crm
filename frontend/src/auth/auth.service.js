@@ -13,6 +13,8 @@ export const login = async ({ loginData }) => {
       loginData
     );
 
+    console.log('Login API response:', response.data);
+
     const { status, data } = response;
 
     successHandler(
@@ -26,6 +28,7 @@ export const login = async ({ loginData }) => {
     return data;
 
   } catch (error) {
+    console.log('Login API error:', error);
     return errorHandler(error);
   }
 };

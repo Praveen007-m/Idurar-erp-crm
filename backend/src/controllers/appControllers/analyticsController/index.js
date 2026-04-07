@@ -16,6 +16,7 @@
  */
 
 const mongoose = require('mongoose');
+const { startOfToday, getComputedStatusExpression } = require('@/utils/repaymentStatus');
 
 // ── collection helpers ────────────────────────────────────────────────────────
 const db        = () => mongoose.connection.db;
@@ -26,9 +27,6 @@ const adminCol  = () => db().collection('admins');
 // ── date helpers ──────────────────────────────────────────────────────────────
 const startOfMonth = () => {
   const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
-};
-const startOfToday = () => {
-  const d = new Date(); d.setHours(0, 0, 0, 0); return d;
 };
 const in7Days = () => {
   const d = new Date();
@@ -81,28 +79,34 @@ const reports = async (req, res) => {
       },
     ]).toArray();
 
-    // Status breakdown with percentages
+    // Status breakdown with percentages (computation from current amountPaid/date logic, not stored status)
+    const today = startOfToday();
     const statusRows = await repCol().aggregate([
       { $match: { removed: { $ne: true } } },
       {
         $addFields: {
-          normalizedStatus: {
-            $toLower: { $trim: { input: { $toString: "$status" } } }
-          }
-        }
+          computedStatus: getComputedStatusExpression(today),
+          amount: { $ifNull: ['$amount', 0] },
+          amountPaid: { $ifNull: ['$amountPaid', 0] },
+        },
       },
       {
         $group: {
-          _id:   "$normalizedStatus",
+          _id: '$computedStatus',
           count: { $sum: 1 },
-          total: { $sum: '$totalAmount' },
+          total: { $sum: '$amount' },
           paid:  { $sum: '$amountPaid' },
         },
       },
       { $sort: { count: -1 } },
     ]).toArray();
 
+    console.log('[reports] Status breakdown computation:');
+    console.log('  Today:', today);
+    console.log('  Computed status rows:', JSON.stringify(statusRows, null, 2));
+
     const grandTotal = statusRows.reduce((s, r) => s + r.count, 0);
+    console.log('  Grand total repayments:', grandTotal);
     const statusBreakdown = statusRows.map((r) => ({
       status: r._id,
       displayStatus: {
@@ -182,6 +186,13 @@ const globalSummary = async (req, res) => {
     const [agg] = await repCol().aggregate([
       { $match: { removed: { $ne: true } } },
       {
+        $addFields: {
+          computedStatus: getComputedStatusExpression(today),
+          amount: { $ifNull: ['$amount', 0] },
+          amountPaid: { $ifNull: ['$amountPaid', 0] },
+        },
+      },
+      {
         $group: {
           _id: null,
           totalCollected:  { $sum: '$amountPaid'  },
@@ -192,7 +203,7 @@ const globalSummary = async (req, res) => {
             $sum: { $cond: [{ $gte: ['$updated', monthStart] }, '$amountPaid', 0] },
           },
           overdueCount: {
-            $sum: { $cond: [{ $in: ['$status', ['DEFAULT', 'LATE']] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$computedStatus', ['default', 'late']] }, 1, 0] },
           },
           upcomingCount: {
             $sum: {
@@ -200,7 +211,7 @@ const globalSummary = async (req, res) => {
                 { $and: [
                   { $gte: ['$date', today]   },
                   { $lte: ['$date', upcoming] },
-                  { $in:  ['$status', ['NOT_STARTED', 'PARTIAL']] },
+                  { $in: ['$computedStatus', ['not_started', 'partial']] },
                 ]},
                 1, 0,
               ],
@@ -347,6 +358,13 @@ const staffDashboard = async (req, res) => {
       const [r] = await repCol().aggregate([
         { $match: { client: { $in: clientIds }, removed: { $ne: true } } },
         {
+          $addFields: {
+            computedStatus: getComputedStatusExpression(today),
+            amount: { $ifNull: ['$amount', 0] },
+            amountPaid: { $ifNull: ['$amountPaid', 0] },
+          },
+        },
+        {
           $group: {
             _id: null,
             totalCollected: { $sum: '$amountPaid'  },
@@ -356,7 +374,7 @@ const staffDashboard = async (req, res) => {
               $sum: { $cond: [{ $gte: ['$updated', monthStart] }, '$amountPaid', 0] },
             },
             overdueCount: {
-              $sum: { $cond: [{ $in: ['$status', ['DEFAULT', 'LATE']] }, 1, 0] },
+              $sum: { $cond: [{ $in: ['$computedStatus', ['default', 'late']] }, 1, 0] },
             },
             upcomingCount: {
               $sum: {
@@ -364,7 +382,7 @@ const staffDashboard = async (req, res) => {
                   { $and: [
                     { $gte: ['$date', today]   },
                     { $lte: ['$date', upcoming] },
-                    { $in:  ['$status', ['NOT_STARTED', 'PARTIAL']] },
+                    { $in: ['$computedStatus', ['not_started', 'partial']] },
                   ]},
                   1, 0,
                 ],

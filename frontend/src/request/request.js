@@ -3,36 +3,57 @@ import { API_BASE_URL } from '@/config/serverApiConfig';
 
 import errorHandler from './errorHandler';
 import successHandler from './successHandler';
-import storePersist from '@/redux/storePersist';
 
-function findKeyByPrefix(object, prefix) {
-  for (var property in object) {
-    if (object.hasOwnProperty(property) && property.toString().startsWith(prefix)) {
-      return property;
-    }
+const normalizeToken = (rawToken) => {
+  if (typeof rawToken !== 'string') return null;
+  let token = rawToken.trim();
+  if (token.toLowerCase().startsWith('bearer ')) {
+    token = token.slice(7).trim();
   }
-}
+  return token || null;
+};
+
+const isValidJwt = (token) => {
+  return typeof token === 'string' && token.split('.').length === 3 && token.split('.').every((part) => part.length > 0);
+};
+
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: false,
+});
+
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const rawToken = localStorage.getItem('token');
+    const token = normalizeToken(rawToken);
+    console.log('CHECK TOKEN:', token);
+
+    if (rawToken && !isValidJwt(token)) {
+      console.error('Malformed JWT token detected in localStorage; removing token');
+      localStorage.removeItem('token');
+      return config;
+    }
+
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('AUTH HEADER:', config.headers.Authorization);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 function includeToken() {
-  axios.defaults.baseURL = API_BASE_URL;
-
-  axios.defaults.withCredentials = false;
-
-  const auth = storePersist.get('auth');
-
-  if (auth?.current?.token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${auth.current.token}`;
-  } else {
-    delete axios.defaults.headers.common['Authorization'];
-  }
+  // no-op: token attachment is handled by axiosInstance interceptor
 }
 
 const request = {
   create: async ({ entity, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.post(entity + '/create', jsonData);
-successHandler(response, {
+      const response = await axiosInstance.post(entity + '/create', jsonData);
+      successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: false,
       });
@@ -43,8 +64,7 @@ successHandler(response, {
   },
   createAndUpload: async ({ entity, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.post(entity + '/create', jsonData, {
+      const response = await axiosInstance.post(entity + '/create', jsonData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -60,8 +80,7 @@ successHandler(response, {
   },
   read: async ({ entity, id }) => {
     try {
-      includeToken();
-      const response = await axios.get(entity + '/read/' + id);
+      const response = await axiosInstance.get(entity + '/read/' + id);
       successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: true,
@@ -73,8 +92,7 @@ successHandler(response, {
   },
   update: async ({ entity, id, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.patch(entity + '/update/' + id, jsonData);
+      const response = await axiosInstance.patch(entity + '/update/' + id, jsonData);
       successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: false,
@@ -86,8 +104,7 @@ successHandler(response, {
   },
   updateAndUpload: async ({ entity, id, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.patch(entity + '/update/' + id, jsonData, {
+      const response = await axiosInstance.patch(entity + '/update/' + id, jsonData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -104,9 +121,8 @@ successHandler(response, {
 
   delete: async ({ entity, id }) => {
     try {
-      includeToken();
       console.log('🚀 ~ request.delete URL:', entity + '/delete/' + id);
-      const response = await axios.delete(entity + '/delete/' + id);
+      const response = await axiosInstance.delete(entity + '/delete/' + id);
       console.log('🚀 ~ request.delete response:', response.data);
       successHandler(response, {
         notifyOnSuccess: false,
@@ -121,12 +137,11 @@ successHandler(response, {
 
   filter: async ({ entity, options = {} }) => {
     try {
-      includeToken();
       let filter = options.filter ? 'filter=' + options.filter : '';
       let equal = options.equal ? '&equal=' + options.equal : '';
       let query = `?${filter}${equal}`;
 
-      const response = await axios.get(entity + '/filter' + query);
+      const response = await axiosInstance.get(entity + '/filter' + query);
       successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: false,
@@ -139,14 +154,13 @@ successHandler(response, {
 
   search: async ({ entity, options = {} }) => {
     try {
-      includeToken();
       let query = '?';
       for (var key in options) {
         query += key + '=' + options[key] + '&';
       }
       query = query.slice(0, -1);
       // headersInstance.cancelToken = source.token;
-      const response = await axios.get(entity + '/search' + query);
+      const response = await axiosInstance.get(entity + '/search' + query);
 
       successHandler(response, {
         notifyOnSuccess: false,
@@ -160,14 +174,13 @@ successHandler(response, {
 
   list: async ({ entity, options = {} }) => {
     try {
-      includeToken();
       let query = '?';
       for (var key in options) {
         query += key + '=' + options[key] + '&';
       }
       query = query.slice(0, -1);
 
-      const response = await axios.get(entity + '/list' + query);
+      const response = await axiosInstance.get(entity + '/list' + query);
 
       successHandler(response, {
         notifyOnSuccess: false,
@@ -180,14 +193,13 @@ successHandler(response, {
   },
   listAll: async ({ entity, options = {} }) => {
     try {
-      includeToken();
       let query = '?';
       for (var key in options) {
         query += key + '=' + options[key] + '&';
       }
       query = query.slice(0, -1);
 
-      const response = await axios.get(entity + '/listAll' + query);
+      const response = await axiosInstance.get(entity + '/listAll' + query);
 
       successHandler(response, {
         notifyOnSuccess: false,
@@ -201,8 +213,7 @@ successHandler(response, {
 
   post: async ({ entity, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.post(entity, jsonData);
+      const response = await axiosInstance.post(entity, jsonData);
 
       return response.data;
     } catch (error) {
@@ -211,8 +222,7 @@ successHandler(response, {
   },
   get: async ({ entity }) => {
     try {
-      includeToken();
-      const response = await axios.get(entity);
+      const response = await axiosInstance.get(entity);
       return response.data;
     } catch (error) {
       return errorHandler(error);
@@ -220,8 +230,7 @@ successHandler(response, {
   },
   patch: async ({ entity, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.patch(entity, jsonData);
+      const response = await axiosInstance.patch(entity, jsonData);
       successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: false,
@@ -234,8 +243,7 @@ successHandler(response, {
 
   upload: async ({ entity, id, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.patch(entity + '/upload/' + id, jsonData, {
+      const response = await axiosInstance.patch(entity + '/upload/' + id, jsonData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -258,13 +266,12 @@ successHandler(response, {
 
   summary: async ({ entity, options = {} }) => {
     try {
-      includeToken();
       let query = '?';
       for (var key in options) {
         query += key + '=' + options[key] + '&';
       }
       query = query.slice(0, -1);
-      const response = await axios.get(entity + '/summary' + query);
+      const response = await axiosInstance.get(entity + '/summary' + query);
 
       successHandler(response, {
         notifyOnSuccess: false,
@@ -279,8 +286,7 @@ successHandler(response, {
 
   mail: async ({ entity, jsonData }) => {
     try {
-      includeToken();
-      const response = await axios.post(entity + '/mail/', jsonData);
+      const response = await axiosInstance.post(entity + '/mail/', jsonData);
       successHandler(response, {
         notifyOnSuccess: false,
         notifyOnFailed: false,
@@ -293,8 +299,7 @@ successHandler(response, {
 
   convert: async ({ entity, id }) => {
     try {
-      includeToken();
-      const response = await axios.get(`${entity}/convert/${id}`);
+      const response = await axiosInstance.get(`${entity}/convert/${id}`);
       successHandler(response, {
         notifyOnSuccess: true,
         notifyOnFailed: true,
