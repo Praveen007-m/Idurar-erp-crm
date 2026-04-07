@@ -332,7 +332,9 @@ function Sidebar({ collapsible, isMobile = false }) {
 
   // Dynamic logo — falls back to local SVG if not set
   const companyLogo = companySettings?.company_logo
-    ? FILE_BASE_URL + companySettings.company_logo
+    ? companySettings.company_logo.startsWith('http')
+      ? companySettings.company_logo
+      : `${FILE_BASE_URL.replace(/\/$/, '')}/${companySettings.company_logo.replace(/^\//, '')}`
     : logoIcon;
 
   const isStaff = currentAdmin?.role === 'staff';
@@ -489,6 +491,12 @@ function Sidebar({ collapsible, isMobile = false }) {
             src={companyLogo}
             alt="Logo"
             style={{ marginLeft: '0px', height: '40px', width: '40px', objectFit: 'contain' }}
+            onError={(e) => {
+              if (e.target.src !== logoIcon) {
+                e.target.onerror = null;
+                e.target.src = logoIcon;
+              }
+            }}
           />
 
           {!showLogoApp && (

@@ -239,7 +239,9 @@ export default function HeaderContent() {
   // Dynamic company name + logo — fall back to defaults if not saved yet
   const companyName = companySettings?.company_name || 'Webaac Solutions Finance Management';
   const companyLogo = companySettings?.company_logo
-    ? FILE_BASE_URL + companySettings.company_logo
+    ? companySettings.company_logo.startsWith('http')
+      ? companySettings.company_logo
+      : `${FILE_BASE_URL.replace(/\/$/, '')}/${companySettings.company_logo.replace(/^\//, '')}`
     : logoIcon;
 
   const handleMenuToggle = () => navMenu.toggle();
@@ -340,6 +342,12 @@ export default function HeaderContent() {
             alt="Logo"
             className="app-logo"
             style={{ height: 28, width: 28, objectFit: 'contain' }}
+            onError={(e) => {
+              if (e.target.src !== logoIcon) {
+                e.target.onerror = null;
+                e.target.src = logoIcon;
+              }
+            }}
           />
           <span
             className="app-title"

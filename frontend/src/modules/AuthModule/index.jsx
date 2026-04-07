@@ -25,6 +25,10 @@ const AuthModule = ({ authContent, AUTH_TITLE, isForRegistre = false }) => {
           <img
             src={logo}
             alt="Webaac Solutions Finance Management"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = logo;
+            }}
             style={{
               margin: '0px auto 20px',
               display: 'block',

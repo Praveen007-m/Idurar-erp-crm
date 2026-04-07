@@ -23,6 +23,10 @@ export default function SideContent() {
         <img
           src={logo}
           alt="Webaac Solutions Finance Management"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = logo;
+          }}
           style={{ margin: '0 0 18px', display: 'block' }}
           height={52}
           width={52}
