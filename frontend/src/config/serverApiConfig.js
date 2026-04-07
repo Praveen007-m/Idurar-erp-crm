@@ -1,16 +1,22 @@
 /**
  * Backend URL
- * Reads from Netlify environment variable
+ * Reads from environment variable
  */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_SERVER;
+const API_URL = import.meta.env.VITE_API_URL;
 
 /**
  * API URL
  */
 export const API_BASE_URL =
   import.meta.env.MODE === "production"
-    ? `${BACKEND_URL}/api`
+    ? API_URL
+      ? `${API_URL}/api`
+      : `${BACKEND_URL}/api`
     : "http://localhost:8888/api";
+
+console.log('[API Config] Mode:', import.meta.env.MODE);
+console.log('[API Config] BASE_URL:', API_BASE_URL);
 
 /**
  * Base URL

@@ -22,14 +22,18 @@ const axiosInstance = axios.create({
   withCredentials: false,
 });
 
+console.log('[Axios] Instance created with baseURL:', axiosInstance.defaults.baseURL);
+
 axiosInstance.interceptors.request.use(
   (config) => {
     const rawToken = localStorage.getItem('token');
     const token = normalizeToken(rawToken);
-    console.log('CHECK TOKEN:', token);
+    console.log('[Axios] Interceptor - CHECK TOKEN:', token ? 'found' : 'not found');
+    console.log('[Axios] Request URL:', config.url);
+    console.log('[Axios] Full Request URL:', config.baseURL + config.url);
 
     if (rawToken && !isValidJwt(token)) {
-      console.error('Malformed JWT token detected in localStorage; removing token');
+      console.error('[Axios] Malformed JWT token detected in localStorage; removing token');
       localStorage.removeItem('token');
       return config;
     }
@@ -37,12 +41,33 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('AUTH HEADER:', config.headers.Authorization);
+      console.log('[Axios] AUTH HEADER ATTACHED:', '✓');
+    } else {
+      console.log('[Axios] No token available for this request');
     }
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('[Axios] Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for logging
+axiosInstance.interceptors.response.use(
+  (response) => {
+    console.log('[Axios] Response received:', response.status, response.config.url);
+    return response;
+  },
+  (error) => {
+    console.error('[Axios] Response error:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.response?.data?.message || error.message,
+    });
+    return Promise.reject(error);
+  }
 );
 
 function includeToken() {

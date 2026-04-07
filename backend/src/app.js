@@ -22,7 +22,9 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  "https://idurar-erp.netlify.app"
+  "https://idurar-erp.netlify.app",
+  "https://idurar-erp-crm-production-8878.up.railway.app",
+  "http://localhost:8888"
 ];
 
 const corsOptions = {

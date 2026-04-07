@@ -7,13 +7,15 @@ import successHandler from '@/request/successHandler';
  * LOGIN
  */
 export const login = async ({ loginData }) => {
+  const loginUrl = `${API_BASE_URL}/login`;
+  console.log('[Auth] LOGIN URL:', loginUrl);
+  console.log('[Auth] LOGIN DATA:', loginData);
+  
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/login`,
-      loginData
-    );
+    const response = await axios.post(loginUrl, loginData);
 
-    console.log('Login API response:', response.data);
+    console.log('[Auth] LOGIN RESPONSE:', response.data);
+    console.log('[Auth] LOGIN STATUS:', response.status);
 
     const { status, data } = response;
 
@@ -28,7 +30,12 @@ export const login = async ({ loginData }) => {
     return data;
 
   } catch (error) {
-    console.log('Login API error:', error);
+    console.error('[Auth] LOGIN ERROR URL:', loginUrl);
+    console.error('[Auth] LOGIN ERROR:', error.message);
+    if (error.response) {
+      console.error('[Auth] LOGIN ERROR STATUS:', error.response.status);
+      console.error('[Auth] LOGIN ERROR DATA:', error.response.data);
+    }
     return errorHandler(error);
   }
 };
