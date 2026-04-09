@@ -31,7 +31,7 @@ const LoginPage = () => {
     console.log('STORED TOKEN:', localStorage.getItem('token'));
 
     if (isSuccess && token) {
-      navigate('/dashboard');
+      navigate('/customer');
     }
   }, [navigate, isSuccess]);
 

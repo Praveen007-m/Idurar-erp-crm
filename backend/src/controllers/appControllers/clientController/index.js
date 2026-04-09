@@ -125,12 +125,13 @@ function modelController() {
       const { sortBy = 'created', sortValue = -1, filter, equal, q, fields } = req.query;
 
       const fieldsArray = fields ? fields.split(',') : [];
-      let searchFields = fieldsArray.length === 0 ? {} : { $or: [] };
+      const searchableFields = ["name", "phone", "email"];
+      let searchFields = {};
 
-      if (q) {
-        for (const field of fieldsArray) {
-          searchFields.$or.push({ [field]: { $regex: new RegExp(q, 'i') } });
-        }
+      if (q && q.trim() !== "") {
+        searchFields.$or = searchableFields.map((field) => ({
+          [field]: { $regex: new RegExp(q, "i") },
+        }));
       }
 
       let filterQuery = {
