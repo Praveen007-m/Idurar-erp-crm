@@ -31,6 +31,8 @@ const LoginPage = () => {
     console.log('STORED TOKEN:', localStorage.getItem('token'));
 
     if (isSuccess && token) {
+      // Clear dashboard PIN lock on every login
+      sessionStorage.removeItem('dashboard_unlocked');
       navigate('/customer');
     }
   }, [navigate, isSuccess]);

@@ -12,6 +12,8 @@ const Logout = () => {
   useLayoutEffect(() => {
     dispatch(crud.resetState());
     dispatch(erp.resetState());
+    // Clear dashboard PIN lock on logout
+    sessionStorage.removeItem('dashboard_unlocked');
   }, [dispatch]);
 
   useEffect(() => {

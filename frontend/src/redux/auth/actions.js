@@ -147,6 +147,7 @@ export const resetPassword =
 
 export const logout = () => (dispatch) => {
   localStorage.removeItem('token');
+  sessionStorage.removeItem('dashboard_unlocked');
   dispatch({
     type: actionTypes.LOGOUT_SUCCESS,
   });

@@ -6,7 +6,7 @@ import ProtectedRoute from './ProtectedRoute';
 const Logout = lazy(() => import('@/pages/Logout.jsx'));
 const NotFound = lazy(() => import('@/pages/NotFound.jsx'));
 
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const DashboardProtected = lazy(() => import('@/components/DashboardProtected'));
 const Customer = lazy(() => import('@/pages/Customer'));
 const Invoice = lazy(() => import('@/pages/Invoice'));
 const InvoiceCreate = lazy(() => import('@/pages/Invoice/InvoiceCreate'));
@@ -67,7 +67,7 @@ let routes = {
       path: '/dashboard',
       element: (
         <ProtectedRoute allowedRoles={['owner', 'admin']}>
-          <Dashboard />
+          <DashboardProtected />
         </ProtectedRoute>
       ),
     },
