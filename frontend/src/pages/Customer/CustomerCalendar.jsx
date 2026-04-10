@@ -26,7 +26,7 @@ import { useMoney, useDate } from '@/settings';
 import { request } from '@/request';
 import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 import RepaymentForm from '@/forms/RepaymentForm';
-import { FILE_BASE_URL } from '@/config/serverApiConfig';
+import { BASE_URL } from '@/config/baseUrl';
 
 const { useBreakpoint } = Grid;
 
@@ -411,18 +411,37 @@ export default function CustomerCalendar() {
           <Row gutter={[12, 12]} align="middle">
             <Col xs={24} sm={8}>
               <Space>
-                <Avatar
-                  size={isMobile ? 40 : 48}
-                  icon={<UserOutlined />}
-                  src={client?.photo ? `${FILE_BASE_URL}${client.photo}` : undefined}
-                  onClick={openProfilePreview}
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e8e8e8',
-                    flexShrink: 0,
-                    cursor: client?.photo ? 'pointer' : 'default',
-                  }}
-                />
+                {client?.photo ? (
+                  <img
+                    src={`${BASE_URL}${client.photo}`}
+                    alt="client"
+                    style={{
+                      width: isMobile ? 40 : 48,
+                      height: isMobile ? 40 : 48,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                    }}
+                    onClick={openProfilePreview}
+                    onError={(e) => {
+                      e.target.src = '/default-avatar.png';
+                    }}
+                  />
+                ) : (
+                  <Avatar
+                    size={isMobile ? 40 : 48}
+                    icon={<UserOutlined />}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      flexShrink: 0,
+                      cursor: 'default',
+                    }}
+                  />
+                )}
                 <div>
                   <Typography.Text type="secondary" style={{ fontSize: 11 }}>{translate('Client')}</Typography.Text>
                   <div style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17 }}>{client?.name || '—'}</div>
@@ -678,17 +697,35 @@ export default function CustomerCalendar() {
               <Descriptions title={<Typography.Text type="secondary">BASIC INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
                 <Descriptions.Item label="Name">{client.name}</Descriptions.Item>
                 <Descriptions.Item label="Profile Photo">
-                  <Avatar
-                    size={56}
-                    icon={<UserOutlined />}
-                    src={client?.photo ? `${FILE_BASE_URL}${client.photo}` : undefined}
-                    onClick={openProfilePreview}
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid #e8e8e8',
-                      cursor: client?.photo ? 'pointer' : 'default',
-                    }}
-                  />
+                  {client?.photo ? (
+                    <img
+                      src={`${BASE_URL}${client.photo}`}
+                      alt="client"
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        background: '#ffffff',
+                        border: '1px solid #e8e8e8',
+                        cursor: 'pointer',
+                      }}
+                      onClick={openProfilePreview}
+                      onError={(e) => {
+                        e.target.src = '/default-avatar.png';
+                      }}
+                    />
+                  ) : (
+                    <Avatar
+                      size={56}
+                      icon={<UserOutlined />}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e8e8e8',
+                        cursor: 'default',
+                      }}
+                    />
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Phone">{client.phone}</Descriptions.Item>
                 <Descriptions.Item label="Email">{client.email || '-'}</Descriptions.Item>
@@ -807,13 +844,16 @@ export default function CustomerCalendar() {
         >
           {client?.photo && (
             <img
-              src={`${FILE_BASE_URL}${client.photo}`}
+              src={`${BASE_URL}${client.photo}`}
               alt={client?.name || 'Client photo'}
               style={{
                 width: '100%',
                 maxHeight: isMobile ? '70vh' : '75vh',
                 objectFit: 'contain',
                 background: '#fff',
+              }}
+              onError={(e) => {
+                e.target.src = '/default-avatar.png';
               }}
             />
           )}
