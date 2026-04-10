@@ -29,7 +29,7 @@ async function connectDB() {
 
 async function generateInstallmentsForClient(client) {
     const Repayment = mongoose.model('Repayment');
-    const { loanAmount, interestRate, term, startDate, repaymentType, interestType, _id: clientId } = client;
+    const { loanAmount, interestRate, term, startDate, repaymentType, _id: clientId } = client;
 
     console.log(`\n[${client.name}] Generating installments...`);
     console.log(`  Loan Amount: ${loanAmount}`);
@@ -84,7 +84,7 @@ async function fixInstallments() {
 
     // Find all active clients (not removed)
     const clients = await Client.find({ removed: false })
-        .select('name loanAmount interestRate term startDate repaymentType interestType createdBy')
+        .select('name loanAmount interestRate term startDate repaymentType createdBy')
         .lean();
 
     console.log(`Found ${clients.length} total clients`);
@@ -152,4 +152,5 @@ connectDB().then(fixInstallments).catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
 });
+
 

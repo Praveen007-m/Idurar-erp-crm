@@ -23,6 +23,10 @@ const schema = new mongoose.Schema({
   country: String,
   address: String,
   email: String,
+  photo: {
+    type: String,
+    default: '',
+  },
   loanAmount: {
     type: Number,
     required: true,
@@ -39,6 +43,10 @@ const schema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  collectionTime: {
+    type: String,
+    default: null,
+  },
   endDate: {
     type: Date,
     validate: {
@@ -53,11 +61,6 @@ const schema = new mongoose.Schema({
     type: String,
     enum: ['Monthly EMI', 'Weekly', 'Daily'],
     required: true,
-  },
-  interestType: {
-    type: String,
-    enum: ['reducing', 'flat'],
-    default: 'reducing',
   },
   status: {
     type: String,

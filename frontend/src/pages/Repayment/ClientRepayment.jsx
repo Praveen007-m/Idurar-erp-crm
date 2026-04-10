@@ -89,6 +89,31 @@ const allowedTransitions = {
   late:          [],
 };
 
+const formatCollectionTime = (value) => {
+  if (!value || typeof value !== 'string') return '-';
+  const normalized = value.trim();
+  const ampmMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2];
+    const suffix = ampmMatch[3].toUpperCase();
+    if (Number.isFinite(hour) && hour >= 1 && hour <= 12) {
+      return `${String(hour).padStart(2, '0')}:${minute} ${suffix}`;
+    }
+  }
+
+  const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!timeMatch) return normalized;
+
+  const hour24 = Number(timeMatch[1]);
+  const minute = timeMatch[2];
+  if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return normalized;
+
+  const suffix = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${String(hour12).padStart(2, '0')}:${minute} ${suffix}`;
+};
+
 export default function ClientRepayment() {
   const { id }    = useParams();
   const translate = useLanguage();
@@ -369,9 +394,9 @@ export default function ClientRepayment() {
               <Descriptions.Item label="Interest Rate">{client.interestRate}%</Descriptions.Item>
               <Descriptions.Item label="Term">{client.term}</Descriptions.Item>
               <Descriptions.Item label="Start Date">{dayjs(client.startDate).format(dateFormat)}</Descriptions.Item>
+              <Descriptions.Item label="Collection Time">{formatCollectionTime(client.collectionTime)}</Descriptions.Item>
               <Descriptions.Item label="Ending Date">{client.endDate ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
               <Descriptions.Item label="Repayment Type">{client.repaymentType}</Descriptions.Item>
-              <Descriptions.Item label="Interest Type">{client.interestType}</Descriptions.Item>
               <Descriptions.Item label="Status">
                 <Tag color={client.status === 'active' ? 'blue' : client.status === 'paid' ? 'green' : 'red'}>
                   {client.status?.toUpperCase()}

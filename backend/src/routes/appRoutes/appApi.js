@@ -9,6 +9,7 @@ const { routesList } = require('@/models/utils');
 const adminController = require('@/controllers/appControllers/adminController');
 const checkRole = require('@/middlewares/checkRole');
 const upload   = require('@/middlewares/upload');
+const { singleStorageUpload } = require('@/middlewares/uploadMiddleware');
 
 // ── Models for staff performance aggregation ──────────────────────────────────
 const Client    = require('@/models/appModels/Client');
@@ -244,15 +245,40 @@ router.route('/dashboard/summary')
 // =============================
 
 const routerApp = (entity, controller) => {
-
-  router.route(`/${entity}/create`)
-    .post(catchErrors(controller['create']));
+  if (entity === 'client') {
+    router.route(`/${entity}/create`)
+      .post(
+        singleStorageUpload({
+          entity: 'client',
+          fieldName: 'photo',
+          fileType: 'image',
+          uploadFieldName: 'file',
+        }),
+        catchErrors(controller['create'])
+      );
+  } else {
+    router.route(`/${entity}/create`)
+      .post(catchErrors(controller['create']));
+  }
 
   router.route(`/${entity}/read/:id`)
     .get(catchErrors(controller['read']));
 
-  router.route(`/${entity}/update/:id`)
-    .patch(catchErrors(controller['update']));
+  if (entity === 'client') {
+    router.route(`/${entity}/update/:id`)
+      .patch(
+        singleStorageUpload({
+          entity: 'client',
+          fieldName: 'photo',
+          fileType: 'image',
+          uploadFieldName: 'file',
+        }),
+        catchErrors(controller['update'])
+      );
+  } else {
+    router.route(`/${entity}/update/:id`)
+      .patch(catchErrors(controller['update']));
+  }
 
   router.route(`/${entity}/delete/:id`)
     .delete(catchErrors(controller['delete']));

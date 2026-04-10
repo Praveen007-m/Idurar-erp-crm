@@ -36,6 +36,12 @@ const calculateClientEndDate = ({ startDate, term, repaymentType }) => {
   return endDate;
 };
 
+const normalizeCollectionTime = (collectionTime) => {
+  if (collectionTime === undefined) return undefined;
+  if (collectionTime === null || collectionTime === '') return null;
+  return collectionTime;
+};
+
 function modelController() {
   const Model = mongoose.model('Client');
   const methods = createCRUDController('Client');
@@ -51,6 +57,7 @@ function modelController() {
       }
 
       delete req.body.endDate;
+      req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
 
       if (!req.body.assigned) {
         req.body.assigned = req.admin._id;
@@ -84,8 +91,7 @@ function modelController() {
           interestRate: result.interestRate,
           term: result.term,
           startDate: result.startDate,
-          repaymentType: result.repaymentType,
-          interestType: result.interestType
+          repaymentType: result.repaymentType
         });
         
         await generateInstallments(result);
@@ -198,6 +204,7 @@ function modelController() {
       let filter = { _id: req.params.id, removed: false };
 
       delete req.body.endDate;
+      req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
 
       const existingClient = await Model.findOne(filter).exec();
 
@@ -209,7 +216,7 @@ function modelController() {
         });
       }
 
-      const loanFieldsChanged = ['loanAmount', 'interestRate', 'term', 'startDate', 'repaymentType', 'interestType'].some(
+      const loanFieldsChanged = ['loanAmount', 'interestRate', 'term', 'startDate', 'repaymentType'].some(
         (field) => req.body[field] !== undefined
       );
 

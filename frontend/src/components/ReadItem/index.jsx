@@ -25,10 +25,10 @@ export default function ReadItem({ config }) {
   const readColumnsFromConfig = Array.isArray(configSafe.readColumns) ? configSafe.readColumns : [];
 
   const readColumns = useMemo(() => {
-    return fields.length ? dataForRead({ fields, translate }) : readColumnsFromConfig;
+    return Object.keys(fields || {}).length > 0 ? dataForRead({ fields, translate }) : readColumnsFromConfig;
   }, [fields, readColumnsFromConfig, translate]);
 
-  const excludedKeys = ['paymentDetails', 'startDate', 'endDate', 'enabled', 'created', 'updated', '__v', '_id', 'removed'];
+  const excludedKeys = ['paymentDetails', 'startDate', 'endDate', 'enabled', 'created', 'updated', '__v', '_id', 'removed', 'photo'];
 
   const formatLabel = (key) => {
     if (!key) return '';

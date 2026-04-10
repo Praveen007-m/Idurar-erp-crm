@@ -28,6 +28,7 @@ import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 const BOX_BORDER = '#28a7ab';
 const BOX_TEXT  = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
+const TODAY_DUE_COLOR = '#1677ff';
 
 const normalizeRepaymentStatus = (status) => {
   const s = String(status || '').trim().toLowerCase();
@@ -75,9 +76,49 @@ const getDisplayStatus = (repayment) => {
   return 'not-started';
 };
 
-const getStatusClassName      = (r) => `status-${getDisplayStatus(r)}`;
 const displayStatusPriority   = { default: 1, late: 2, partial: 3, paid: 4, 'not-started': 5 };
 const roundCurrency           = (v) => Number.parseFloat(Number(v || 0).toFixed(2));
+
+const getRepaymentEntryStyle = (repaymentLike) => {
+  const today = dayjs().startOf('day');
+  const itemDate = dayjs(repaymentLike?.date).startOf('day');
+  const isToday = itemDate.isSame(today, 'day');
+  const status = getDisplayStatus(repaymentLike);
+
+  console.log('TODAY:', today.format());
+  console.log('ITEM DATE:', itemDate.format());
+  console.log('IS TODAY:', isToday);
+
+  let backgroundColor;
+  let color;
+
+  if (isToday) {
+    backgroundColor = TODAY_DUE_COLOR;
+    color = '#fff';
+  } else if (status === 'paid') {
+    backgroundColor = repaymentStatusColor.paid;
+    color = '#fff';
+  } else if (status === 'default') {
+    backgroundColor = repaymentStatusColor.default;
+    color = '#fff';
+  } else if (status === 'late') {
+    backgroundColor = repaymentStatusColor.late;
+    color = '#000';
+  } else if (status === 'partial') {
+    backgroundColor = repaymentStatusColor.partial;
+    color = '#fff';
+  } else {
+    backgroundColor = repaymentStatusColor['not-started'];
+    color = '#000';
+  }
+
+  return {
+    backgroundColor,
+    color,
+    fontWeight: isToday ? 600 : undefined,
+    border: isToday ? `1px solid ${TODAY_DUE_COLOR}` : undefined,
+  };
+};
 
 const resolveClientId = (client) => {
   if (!client) return null;
@@ -121,33 +162,18 @@ const buildRepaymentPayloadFromClient = (client, dueDate) => {
   }
 
   const schedule = [];
+  const periodRate = periodsPerMonth > 0 ? monthlyRate / periodsPerMonth : monthlyRate;
+  let outstanding = principal;
 
-  if (client?.interestType === 'flat') {
-    const totalInterest = principal * monthlyRate * totalMonths;
-    const interestPerInstallment = installmentCount > 0 ? totalInterest / installmentCount : 0;
-
-    for (let index = 1; index <= installmentCount; index += 1) {
-      schedule.push({
-        date: start.add(index, durationUnit).format('YYYY-MM-DD'),
-        principal: roundCurrency(principalPerInstallment),
-        interest: roundCurrency(interestPerInstallment),
-        amount: roundCurrency(principalPerInstallment + interestPerInstallment),
-      });
-    }
-  } else {
-    const periodRate = periodsPerMonth > 0 ? monthlyRate / periodsPerMonth : monthlyRate;
-    let outstanding = principal;
-
-    for (let index = 1; index <= installmentCount; index += 1) {
-      const interest = outstanding * periodRate;
-      schedule.push({
-        date: start.add(index, durationUnit).format('YYYY-MM-DD'),
-        principal: roundCurrency(principalPerInstallment),
-        interest: roundCurrency(interest),
-        amount: roundCurrency(principalPerInstallment + interest),
-      });
-      outstanding = Math.max(0, outstanding - principalPerInstallment);
-    }
+  for (let index = 1; index <= installmentCount; index += 1) {
+    const interest = outstanding * periodRate;
+    schedule.push({
+      date: start.add(index, durationUnit).format('YYYY-MM-DD'),
+      principal: roundCurrency(principalPerInstallment),
+      interest: roundCurrency(interest),
+      amount: roundCurrency(principalPerInstallment + interest),
+    });
+    outstanding = Math.max(0, outstanding - principalPerInstallment);
   }
 
   const selectedInstallment =
@@ -540,9 +566,16 @@ export default function Repayment() {
                           const forDisplay = repayment || { status: 'not-started', date: day.toDate() };
                           return (
                             <div key={`${client._id}-${day.format('YYYY-MM-DD')}`}
-                              className={`week-entry ${getStatusClassName(forDisplay)}`}
+                              className="week-entry"
                               onClick={() => handleClientClick(client, day.format('YYYY-MM-DD'), repayment)}
-                              style={{ cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 4, marginBottom: 4 }}>
+                              style={{
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                marginBottom: 4,
+                                ...getRepaymentEntryStyle(forDisplay),
+                              }}>
                               {client?.name}
                             </div>
                           );
@@ -572,8 +605,10 @@ export default function Repayment() {
                   return (
                     <div className="calendar-cell" style={{
                       minHeight: 110, padding: 6, borderRadius: 8,
-                      border: dayClients.length ? '1px solid rgba(40,167,171,0.28)' : '1px solid #f0f0f0',
-                      background: dayClients.length ? '#fcffff' : '#ffffff',
+                      border: date.isSame(dayjs(), 'day')
+                        ? `1px solid ${TODAY_DUE_COLOR}`
+                        : dayClients.length ? '1px solid rgba(40,167,171,0.28)' : '1px solid #f0f0f0',
+                      background: date.isSame(dayjs(), 'day') ? '#f0f7ff' : dayClients.length ? '#fcffff' : '#ffffff',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography.Text strong style={{ fontSize: 12 }}>{date.date()}</Typography.Text>
@@ -589,9 +624,14 @@ export default function Repayment() {
                           return (
                             <button type="button"
                               key={`${client._id}-${date.date()}`}
-                              className={`calendar-client-entry ${getStatusClassName(forDisplay)}`}
+                              className="calendar-client-entry"
                               onClick={(e) => { e.stopPropagation(); handleClientClick(client, date.format('YYYY-MM-DD'), repayment); }}
-                              style={{ fontSize: 11, width: '100%', textAlign: 'left' }}>
+                              style={{
+                                fontSize: 11,
+                                width: '100%',
+                                textAlign: 'left',
+                                ...getRepaymentEntryStyle(forDisplay),
+                              }}>
                               {client?.name}
                             </button>
                           );

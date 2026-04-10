@@ -11,7 +11,7 @@
  *   repayments: { client (ObjectId), date, principal, interest,
  *                 totalAmount, amountPaid, balance, status, removed }
  *   clients:    { name, phone, email, loanAmount, interestRate, term,
- *                 repaymentType, interestType, status, removed, assignedTo? }
+ *                 repaymentType, status, removed, assignedTo? }
  *   admins:     { name, surname, email, role, enabled, removed }
  */
 

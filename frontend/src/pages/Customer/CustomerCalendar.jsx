@@ -26,12 +26,14 @@ import { useMoney, useDate } from '@/settings';
 import { request } from '@/request';
 import { repaymentStatusColor } from '@/utils/repaymentStatusColor';
 import RepaymentForm from '@/forms/RepaymentForm';
+import { FILE_BASE_URL } from '@/config/serverApiConfig';
 
 const { useBreakpoint } = Grid;
 
 const BOX_BORDER = '#28a7ab';
 const BOX_TEXT = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
+const TODAY_DUE_COLOR = '#1677ff';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,6 +89,31 @@ const LegendDot = ({ color, label }) => (
   </span>
 );
 
+const formatCollectionTime = (value) => {
+  if (!value || typeof value !== 'string') return '-';
+  const normalized = value.trim();
+  const ampmMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2];
+    const suffix = ampmMatch[3].toUpperCase();
+    if (Number.isFinite(hour) && hour >= 1 && hour <= 12) {
+      return `${String(hour).padStart(2, '0')}:${minute} ${suffix}`;
+    }
+  }
+
+  const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!timeMatch) return normalized;
+
+  const hour24 = Number(timeMatch[1]);
+  const minute = timeMatch[2];
+  if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return normalized;
+
+  const suffix = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${String(hour12).padStart(2, '0')}:${minute} ${suffix}`;
+};
+
 // ── Mobile week list ──────────────────────────────────────────────────────────
 
 function WeekListView({ weekDays, eventsByDate, moneyFormatter, onEventClick }) {
@@ -123,13 +150,24 @@ function WeekListView({ weekDays, eventsByDate, moneyFormatter, onEventClick }) 
                     style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '10px 12px', marginBottom: 6, borderRadius: 8, cursor: 'pointer',
-                      background: `${event.color}18`, border: `1px solid ${event.color}55`,
+                      background: event.isDueToday ? TODAY_DUE_COLOR : `${event.color}18`,
+                      border: `1px solid ${event.isDueToday ? TODAY_DUE_COLOR : `${event.color}55`}`,
+                      color: event.isDueToday ? '#ffffff' : undefined,
+                      fontWeight: event.isDueToday ? 600 : undefined,
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: 14, color: event.color }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: event.isDueToday ? '#ffffff' : event.color }}>
                       {moneyFormatter({ amount: event.repayment.amount })}
                     </span>
-                    <Tag color={event.color} style={{ borderRadius: 20, fontSize: 11, margin: 0 }}>
+                    <Tag
+                      color={event.color}
+                      style={{
+                        borderRadius: 20,
+                        fontSize: 11,
+                        margin: 0,
+                        fontWeight: event.isDueToday ? 600 : undefined,
+                      }}
+                    >
                       {event.status.replace(/-|_/g, ' ').toUpperCase()}
                     </Tag>
                   </div>
@@ -171,9 +209,16 @@ export default function CustomerCalendar() {
   // ── Edit modal state ──────────────────────────────────────────────────────
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
   const [editingRepayment, setEditingRepayment] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [form] = Form.useForm();
+  const today = dayjs().startOf('day');
+
+  const openProfilePreview = () => {
+    if (!client?.photo) return;
+    setProfilePreviewOpen(true);
+  };
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day')),
@@ -203,14 +248,24 @@ export default function CustomerCalendar() {
   const calendarEvents = useMemo(() =>
     repayments.map((r) => {
       const status = getDisplayStatus(r);
+      const itemDate = dayjs(r.date).startOf('day');
+      const isDueToday = itemDate.isSame(today, 'day');
+
+      console.log('TODAY:', today.format());
+      console.log('ITEM DATE:', itemDate.format());
+      console.log('MATCH:', isDueToday);
+
       return {
         id: r._id,
         date: dayjs(r.date),
-        color: repaymentStatusColor[status] || repaymentStatusColor['not-started'],
+        color: isDueToday
+          ? TODAY_DUE_COLOR
+          : (repaymentStatusColor[status] || repaymentStatusColor['not-started']),
         repayment: r,
         status,
+        isDueToday,
       };
-    }), [repayments]
+    }), [repayments, today]
   );
 
   const eventsByDate = useMemo(() => {
@@ -356,7 +411,18 @@ export default function CustomerCalendar() {
           <Row gutter={[12, 12]} align="middle">
             <Col xs={24} sm={8}>
               <Space>
-                <Avatar size={isMobile ? 40 : 48} icon={<UserOutlined />} style={{ background: BOX_BORDER, flexShrink: 0 }} />
+                <Avatar
+                  size={isMobile ? 40 : 48}
+                  icon={<UserOutlined />}
+                  src={client?.photo ? `${FILE_BASE_URL}${client.photo}` : undefined}
+                  onClick={openProfilePreview}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e8e8e8',
+                    flexShrink: 0,
+                    cursor: client?.photo ? 'pointer' : 'default',
+                  }}
+                />
                 <div>
                   <Typography.Text type="secondary" style={{ fontSize: 11 }}>{translate('Client')}</Typography.Text>
                   <div style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17 }}>{client?.name || '—'}</div>
@@ -545,8 +611,11 @@ export default function CustomerCalendar() {
                         {visible.map((event) => (
                           <div key={event.id} style={{
                             padding: '3px 6px', borderRadius: 4,
-                            background: event.color, color: '#fff',
-                            fontSize: 11, fontWeight: 500,
+                            background: event.color,
+                            color: '#fff',
+                            border: event.isDueToday ? `1px solid ${TODAY_DUE_COLOR}` : undefined,
+                            fontSize: 11,
+                            fontWeight: event.isDueToday ? 600 : 500,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center',
                           }}>
                             {moneyFormatter({ amount: event.repayment.amount })}
@@ -608,6 +677,19 @@ export default function CustomerCalendar() {
             <>
               <Descriptions title={<Typography.Text type="secondary">BASIC INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
                 <Descriptions.Item label="Name">{client.name}</Descriptions.Item>
+                <Descriptions.Item label="Profile Photo">
+                  <Avatar
+                    size={56}
+                    icon={<UserOutlined />}
+                    src={client?.photo ? `${FILE_BASE_URL}${client.photo}` : undefined}
+                    onClick={openProfilePreview}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      cursor: client?.photo ? 'pointer' : 'default',
+                    }}
+                  />
+                </Descriptions.Item>
                 <Descriptions.Item label="Phone">{client.phone}</Descriptions.Item>
                 <Descriptions.Item label="Email">{client.email || '-'}</Descriptions.Item>
                 <Descriptions.Item label="Address">{client.address || '-'}</Descriptions.Item>
@@ -619,9 +701,9 @@ export default function CustomerCalendar() {
                 <Descriptions.Item label="Interest Rate">{client.interestRate}%</Descriptions.Item>
                 <Descriptions.Item label="Term">{client.term}</Descriptions.Item>
                 <Descriptions.Item label="Start Date">{client?.startDate && dayjs(client.startDate).isValid() ? dayjs(client.startDate).format(dateFormat) : '-'}</Descriptions.Item>
+                <Descriptions.Item label="Collection Time">{formatCollectionTime(client.collectionTime)}</Descriptions.Item>
                 <Descriptions.Item label="Ending Date">{client?.endDate && dayjs(client.endDate).isValid() ? dayjs(client.endDate).format(dateFormat) : '-'}</Descriptions.Item>
                 <Descriptions.Item label="Repayment Type">{client.repaymentType}</Descriptions.Item>
-                <Descriptions.Item label="Interest Type">{client.interestType}</Descriptions.Item>
                 <Descriptions.Item label="Status">
                   <Tag color={client.status === 'active' ? 'blue' : client.status === 'paid' ? 'green' : 'red'}>
                     {client.status?.toUpperCase()}
@@ -712,6 +794,28 @@ export default function CustomerCalendar() {
                 })()}
               </Descriptions>
             </>
+          )}
+        </Modal>
+
+        <Modal
+          open={profilePreviewOpen}
+          footer={null}
+          onCancel={() => setProfilePreviewOpen(false)}
+          centered
+          width={isMobile ? '95vw' : 720}
+          destroyOnClose
+        >
+          {client?.photo && (
+            <img
+              src={`${FILE_BASE_URL}${client.photo}`}
+              alt={client?.name || 'Client photo'}
+              style={{
+                width: '100%',
+                maxHeight: isMobile ? '70vh' : '75vh',
+                objectFit: 'contain',
+                background: '#fff',
+              }}
+            />
           )}
         </Modal>
 

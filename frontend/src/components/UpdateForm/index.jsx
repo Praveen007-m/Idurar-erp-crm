@@ -8,6 +8,40 @@ import { selectUpdatedItem } from '@/redux/crud/selectors';
 import { Form } from 'antd';
 import Loading from '@/components/Loading';
 
+const parseCollectionTime = (value) => {
+  if (!value || typeof value !== 'string') return undefined;
+
+  const trimmedValue = value.trim();
+  const ampmMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+
+  let normalizedValue = trimmedValue;
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2];
+    const meridiem = ampmMatch[3].toUpperCase();
+
+    if (!Number.isFinite(hour) || hour < 1 || hour > 12) return undefined;
+
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+
+    normalizedValue = `${String(hour).padStart(2, '0')}:${minute}:00`;
+  } else if (/^\d{2}:\d{2}$/.test(trimmedValue)) {
+    normalizedValue = `${trimmedValue}:00`;
+  }
+
+  const parsedValue = dayjs(`1970-01-01T${normalizedValue}`);
+
+  return parsedValue.isValid() ? parsedValue : undefined;
+};
+
+const normalizeFormValues = (values) => ({
+  ...values,
+  collectionTime: values?.collectionTime?.format
+    ? values.collectionTime.format('HH:mm:ss')
+    : values?.collectionTime || null,
+});
+
 export default function UpdateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
   const dispatch = useDispatch();
@@ -32,15 +66,16 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
 
   const onSubmit = (fieldsValue) => {
     const id = current._id;
+    const normalizedValues = normalizeFormValues(fieldsValue);
 
-    if (fieldsValue.file && withUpload) {
-      fieldsValue.file = fieldsValue.file[0].originFileObj;
+    if (normalizedValues.file && withUpload) {
+      normalizedValues.file = normalizedValues.file[0].originFileObj;
     }
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {
     //   acc[key] = typeof fieldsValue[key] === 'string' ? fieldsValue[key].trim() : fieldsValue[key];
     //   return acc;
     // }, {});
-    dispatch(crud.update({ entity, id, jsonData: fieldsValue, withUpload }));
+    dispatch(crud.update({ entity, id, jsonData: normalizedValues, withUpload }));
   };
   useEffect(() => {
     if (current) {
@@ -61,6 +96,12 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
         newValues = {
           ...newValues,
           startDate: dayjs(newValues['startDate']),
+        };
+      }
+      if (newValues.collectionTime) {
+        newValues = {
+          ...newValues,
+          collectionTime: parseCollectionTime(newValues.collectionTime),
         };
       }
       if (newValues.expiredDate) {

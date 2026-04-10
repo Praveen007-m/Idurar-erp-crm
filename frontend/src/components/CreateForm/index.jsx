@@ -7,6 +7,13 @@ import { selectCreatedItem } from '@/redux/crud/selectors';
 import { Form } from 'antd';
 import Loading from '@/components/Loading';
 
+const normalizeFormValues = (values) => ({
+  ...values,
+  collectionTime: values?.collectionTime?.format
+    ? values.collectionTime.format('HH:mm:ss')
+    : values?.collectionTime || null,
+});
+
 export default function CreateForm({ config, formElements, withUpload = false, onCancel }) {
   let { entity } = config;
   const dispatch = useDispatch();
@@ -28,10 +35,12 @@ export default function CreateForm({ config, formElements, withUpload = false, o
   };
 
   const onSubmit = (fieldsValue) => {
+    const normalizedValues = normalizeFormValues(fieldsValue);
+
     // Manually trim values before submission
 
-    if (fieldsValue.file && withUpload) {
-      fieldsValue.file = fieldsValue.file[0].originFileObj;
+    if (normalizedValues.file && withUpload) {
+      normalizedValues.file = normalizedValues.file[0].originFileObj;
     }
 
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {
@@ -39,7 +48,7 @@ export default function CreateForm({ config, formElements, withUpload = false, o
     //   return acc;
     // }, {});
 
-    dispatch(crud.create({ entity, jsonData: fieldsValue, withUpload }));
+    dispatch(crud.create({ entity, jsonData: normalizedValues, withUpload }));
   };
 
   useEffect(() => {

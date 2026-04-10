@@ -12,7 +12,6 @@ const generateInstallments = async (client) => {
         term,
         startDate,
         repaymentType,
-        interestType,
         createdBy,
     } = client;
 
@@ -54,7 +53,6 @@ const generateInstallments = async (client) => {
         term,
         startDate,
         repaymentType,
-        interestType,
         createdBy,
     });
 

@@ -542,7 +542,6 @@ function modelController() {
           term: client.term,
           startDate: client.startDate,
           repaymentType: client.repaymentType,
-          interestType: client.interestType,
           createdBy: client.createdBy,
         });
 

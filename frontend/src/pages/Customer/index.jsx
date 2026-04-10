@@ -51,6 +51,7 @@ export default function Customer() {
       updateForm={() => <CustomerForm isUpdateForm={true} />}
       config={config}
       extra={extra}
+      withUpload={true}
     />
   );
 }

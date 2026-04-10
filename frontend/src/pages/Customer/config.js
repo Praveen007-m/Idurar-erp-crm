@@ -33,6 +33,31 @@ const getComputedEndDate = (record) => {
   return calculateFallbackEndDate(record?.startDate, record?.term, record?.repaymentType);
 };
 
+const formatCollectionTime = (time) => {
+  if (!time || typeof time !== 'string') return '-';
+  const normalized = time.trim();
+  const ampmMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1]);
+    const minute = ampmMatch[2];
+    const suffix = ampmMatch[3].toUpperCase();
+    if (Number.isFinite(hour) && hour >= 1 && hour <= 12) {
+      return `${String(hour).padStart(2, '0')}:${minute} ${suffix}`;
+    }
+  }
+
+  const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!timeMatch) return normalized;
+
+  const hour24 = Number(timeMatch[1]);
+  const minute = timeMatch[2];
+  if (!Number.isFinite(hour24) || hour24 < 0 || hour24 > 23) return normalized;
+
+  const suffix = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 || 12;
+  return `${String(hour12).padStart(2, '0')}:${minute} ${suffix}`;
+};
+
 export const fields = {
   name: {
     type: 'string',
@@ -57,6 +82,11 @@ export const fields = {
   },
   startDate: {
     type: 'date',
+  },
+  collectionTime: {
+    label: 'Collection Time',
+    render: (time) => formatCollectionTime(time),
+    sorter: (a, b) => (a?.collectionTime || '').localeCompare(b?.collectionTime || ''),
   },
   endDate: {
     label: 'Ending Date',
