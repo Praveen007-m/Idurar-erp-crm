@@ -15,7 +15,7 @@ import { selectCurrentItem } from '@/redux/crud/selectors';
 import useLanguage from '@/locale/useLanguage';
 import { crud } from '@/redux/crud/actions';
 import { useCrudContext } from '@/context/crud';
-import { BASE_URL } from '@/config/serverApiConfig';
+import { BASE_URL } from '@/config/baseUrl';
 
 import { CrudLayout } from '@/layout';
 
@@ -60,6 +60,7 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
           {currentItem?.photo && (
             <img
               src={`${BASE_URL}${currentItem.photo}`}
+              alt="client"
               style={{
                 width: 80,
                 height: 80,
@@ -68,7 +69,10 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
                 background: '#fff',
                 cursor: 'pointer'
               }}
-              onClick={() => window.open(`${BASE_URL}${currentItem.photo}`)}
+              onClick={() => window.open(`${BASE_URL}${currentItem.photo}`, '_blank')}
+              onError={(e) => {
+                e.target.src = '/default-avatar.png';
+              }}
             />
           )}
         </Col>

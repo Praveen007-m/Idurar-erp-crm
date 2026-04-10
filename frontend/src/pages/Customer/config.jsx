@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { createElement } from 'react';
-import { BASE_URL } from '@/config/serverApiConfig';
+import { BASE_URL } from '@/config/baseUrl';
 
 const avatarStyle = {
   width: 40,
@@ -71,10 +71,13 @@ const formatCollectionTime = (time) => {
 export const fields = {
   photo: {
     label: 'Photo',
-    render: (photo) => (
-      photo ? (
+    render: (photo) => {
+      if (!photo) return 'N/A';
+
+      return (
         <img
           src={`${BASE_URL}${photo}`}
+          alt="client"
           style={{
             width: 40,
             height: 40,
@@ -82,11 +85,12 @@ export const fields = {
             objectFit: 'cover',
             background: '#fff'
           }}
+          onError={(e) => {
+            e.target.src = '/default-avatar.png';
+          }}
         />
-      ) : (
-        <div className="avatar-placeholder">N/A</div>
-      )
-    )
+      );
+    }
   },
   name: {
     type: 'string',
