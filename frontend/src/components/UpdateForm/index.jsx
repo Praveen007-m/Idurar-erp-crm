@@ -69,7 +69,8 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
     const normalizedValues = normalizeFormValues(fieldsValue);
 
     if (normalizedValues.file && withUpload) {
-      normalizedValues.file = normalizedValues.file[0].originFileObj;
+      normalizedValues.photo = normalizedValues.file[0].originFileObj;
+      delete normalizedValues.file;
     }
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {
     //   acc[key] = typeof fieldsValue[key] === 'string' ? fieldsValue[key].trim() : fieldsValue[key];

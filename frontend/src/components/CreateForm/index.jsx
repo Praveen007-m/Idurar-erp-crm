@@ -40,7 +40,8 @@ export default function CreateForm({ config, formElements, withUpload = false, o
     // Manually trim values before submission
 
     if (normalizedValues.file && withUpload) {
-      normalizedValues.file = normalizedValues.file[0].originFileObj;
+      normalizedValues.photo = normalizedValues.file[0].originFileObj;
+      delete normalizedValues.file;
     }
 
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {

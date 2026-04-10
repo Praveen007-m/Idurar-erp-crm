@@ -15,6 +15,7 @@ import { selectCurrentItem } from '@/redux/crud/selectors';
 import useLanguage from '@/locale/useLanguage';
 import { crud } from '@/redux/crud/actions';
 import { useCrudContext } from '@/context/crud';
+import { BASE_URL } from '@/config/serverApiConfig';
 
 import { CrudLayout } from '@/layout';
 
@@ -56,6 +57,20 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
       <Row style={show} gutter={[24, 24]}>
         <Col xs={24} md={10}>
           <p style={{ marginBottom: '10px' }}>{labels}</p>
+          {currentItem?.photo && (
+            <img
+              src={`${BASE_URL}${currentItem.photo}`}
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                background: '#fff',
+                cursor: 'pointer'
+              }}
+              onClick={() => window.open(`${BASE_URL}${currentItem.photo}`)}
+            />
+          )}
         </Col>
         <Col xs={24} md={14}>
           {showEditDelete && (

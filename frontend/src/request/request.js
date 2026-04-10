@@ -4,6 +4,55 @@ import { API_BASE_URL } from '@/config/serverApiConfig';
 import errorHandler from './errorHandler';
 import successHandler from './successHandler';
 
+const isDayjsLike = (value) =>
+  value &&
+  typeof value === 'object' &&
+  typeof value.format === 'function' &&
+  typeof value.toISOString === 'function';
+
+const appendFormDataValue = (formData, key, value) => {
+  if (value === undefined || value === null) {
+    formData.append(key, '');
+    return;
+  }
+
+  if (value instanceof File || value instanceof Blob) {
+    formData.append(key, value);
+    return;
+  }
+
+  if (isDayjsLike(value)) {
+    formData.append(key, value.toISOString());
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      appendFormDataValue(formData, `${key}[${index}]`, item);
+    });
+    return;
+  }
+
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+      appendFormDataValue(formData, `${key}[${nestedKey}]`, nestedValue);
+    });
+    return;
+  }
+
+  formData.append(key, value);
+};
+
+const toMultipartFormData = (jsonData = {}) => {
+  const formData = new FormData();
+
+  Object.entries(jsonData).forEach(([key, value]) => {
+    appendFormDataValue(formData, key, value);
+  });
+
+  return formData;
+};
+
 const normalizeToken = (rawToken) => {
   if (typeof rawToken !== 'string') return null;
   let token = rawToken.trim();
@@ -89,7 +138,7 @@ const request = {
   },
   createAndUpload: async ({ entity, jsonData }) => {
     try {
-      const response = await axiosInstance.post(entity + '/create', jsonData, {
+      const response = await axiosInstance.post(entity + '/create', toMultipartFormData(jsonData), {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -129,7 +178,7 @@ const request = {
   },
   updateAndUpload: async ({ entity, id, jsonData }) => {
     try {
-      const response = await axiosInstance.patch(entity + '/update/' + id, jsonData, {
+      const response = await axiosInstance.patch(entity + '/update/' + id, toMultipartFormData(jsonData), {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

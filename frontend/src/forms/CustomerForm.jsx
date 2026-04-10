@@ -1,6 +1,7 @@
 import { Form, Input, DatePicker, TimePicker, InputNumber, Select, Button, Row, Col, Upload, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useState, useEffect } from 'react';
 import {
   validatePhoneNumber,
   handlePhoneInput,
@@ -11,7 +12,6 @@ import {
 import useLanguage from '@/locale/useLanguage';
 import useRole from '@/hooks/useRole';
 import { request } from '@/request';
-import { useState, useEffect } from 'react';
 
 export default function CustomerForm({ isUpdateForm = false, form }) {
   const translate = useLanguage();
@@ -38,12 +38,9 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
 
   const normalizeFile = (e) => {
     if (Array.isArray(e)) return e;
-    return e?.fileList;
+    return e?.fileList || [];
   };
 
-  /**
-   * Fetch staff list
-   */
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -73,10 +70,6 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
     fetchStaff();
   }, [isAdmin]);
 
-  /**
-   * Convert assigned object -> assigned _id
-   * So dropdown shows correct value in edit mode
-   */
   useEffect(() => {
     if (!form) return;
     const assigned = form.getFieldValue('assigned');
@@ -94,9 +87,6 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
     }
   }, [form]);
 
-  /**
-   * Prevent empty string values
-   */
   const validateEmptyString = (_, value) => {
     if (value && value.trim() === '') {
       return Promise.reject(new Error('Field cannot be empty'));
@@ -109,25 +99,23 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
       {/* Photo */}
       <Form.Item
         name="file"
-        label={translate('photo') || 'Photo'}
+        label="Photo"
         valuePropName="fileList"
-        getValueFromEvent={normalizeFile}
+        getValueFromEvent={(e) => e?.fileList}
       >
         <Upload
-          beforeUpload={beforeUpload}
+          beforeUpload={() => false}
           maxCount={1}
           accept="image/*"
-          capture="environment"
           listType="picture-card"
         >
           <div>
             <PlusOutlined />
-            <div style={{ marginTop: 8, fontSize: 12 }}>{translate('click_to_upload') || 'Take / Upload'}</div>
+            <div>Upload</div>
           </div>
         </Upload>
       </Form.Item>
 
-      {/* Name */}
       <Form.Item
         label={translate('name')}
         name="name"
@@ -136,10 +124,9 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
           { validator: validateEmptyString },
         ]}
       >
-        <Input placeholder="Enter name"/>
+        <Input placeholder="Enter name" />
       </Form.Item>
 
-      {/* Address */}
       <Form.Item
         label={translate('address')}
         name="address"
@@ -148,12 +135,12 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
           { validator: validateEmptyString },
         ]}
       >
-        <Input placeholder="Enter address"/>
+        <Input placeholder="Enter address" />
       </Form.Item>
 
       {/* Phone + Email */}
       <Row gutter={12}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item
             name="phone"
             label={translate('Phone')}
@@ -177,7 +164,7 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
           </Form.Item>
         </Col>
 
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item
             name="email"
             label={translate('email')}
@@ -192,19 +179,18 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
         </Col>
       </Row>
 
-      {/* Loan Amount + Interest */}
-      <Row gutter={[16, 0]}>
-        <Col span={12}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24} sm={12}>
           <Form.Item
             label={translate('loanAmount')}
             name="loanAmount"
             rules={[{ required: true }]}
           >
-            <InputNumber style={{ width: '100%' }} placeholder="Enter loan amount"/>
+            <InputNumber style={{ width: '100%' }} placeholder="Enter loan amount" />
           </Form.Item>
         </Col>
 
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item
             label={
               <span style={{ whiteSpace: 'nowrap' }}>
@@ -214,56 +200,60 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
             name="interestRate"
             rules={[{ required: true }]}
           >
-            <InputNumber style={{ width: '100%' }} placeholder="Enter interest rate"/>
+            <InputNumber style={{ width: '100%' }} placeholder="Enter interest rate" />
           </Form.Item>
         </Col>
       </Row>
 
       {/* 🔥 Term + Start Date + Collection Time (Aligned Properly) */}
-      <Row gutter={[16, 0]}>
-        <Col span={8}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24}>
+          <Form.Item name="startDate" label={translate('startDate')} rules={[{ required: true }]} getValueProps={(value) => ({ value: value ? dayjs(value) : undefined })}>
+            <DatePicker
+              style={{ width: '100%' }}
+              size="large"
+              format="DD/MM/YYYY"
+              inputReadOnly
+              getPopupContainer={(trigger) => trigger.parentNode}
+            />
+          </Form.Item>
+        </Col>
+
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="collectionTime"
+            label={<span style={{ whiteSpace: 'nowrap' }}>Collection Time</span>}
+          >
+            <TimePicker
+              format="h:mm A"
+              use12Hours
+              size="large"
+              style={{ width: '100%' }}
+              getPopupContainer={(trigger) => trigger.parentNode}
+            />
+          </Form.Item>
+        </Col>
+
+        <Col xs={24} sm={12}>
           <Form.Item
             label={translate('term')}
             name="term"
             rules={[{ required: true }]}
           >
-            <Input placeholder="Enter term"/>
-          </Form.Item>
-        </Col>
-
-        <Col span={8}>
-          <Form.Item
-            label={translate('startDate')}
-            name="startDate"
-            rules={[{ required: true }]}
-            getValueProps={(value) => ({
-              value: value ? dayjs(value) : undefined,
-            })}
-          >
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-
-        <Col span={8}>
-          <Form.Item
-            label="Collection Time"
-            name="collectionTime"
-          >
-            <TimePicker format="h:mm A" use12Hours style={{ width: "100%" }} />
+            <Input size="large" placeholder="Enter term" />
           </Form.Item>
         </Col>
       </Row>
 
-      {/* Repayment / Status */}
-      <Row gutter={12}>
-        <Col span={12}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24} sm={12}>
           <Form.Item
             label={translate('repaymentType')}
             name="repaymentType"
             rules={[{ required: true }]}
           >
             <Select
-            placeholder="Select repayment type"
+              placeholder="Select repayment type"
               options={[
                 { value: 'Monthly EMI', label: translate('monthly_emi') },
                 { value: 'Weekly', label: translate('weekly') },
@@ -273,14 +263,14 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
           </Form.Item>
         </Col>
 
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item
             label={translate('status')}
             name="status"
             rules={[{ required: true }]}
           >
             <Select
-            placeholder="Select status"
+              placeholder="Select status"
               options={[
                 { value: 'active', label: translate('active') },
                 { value: 'paid', label: translate('paid') },
@@ -294,7 +284,7 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
       {/* Assigned Staff - Admin Only */}
       {isAdmin && (
         <Row gutter={12}>
-          <Col span={12}>
+          <Col xs={24} sm={12}>
             <Form.Item
               label={translate('assignedStaff') || 'Assigned Staff'}
               name="assigned"
@@ -321,23 +311,22 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
         </Row>
       )}
 
-      {/* Payment Details */}
       <div style={{ marginTop: 24, marginBottom: 16 }}>
         <h4 style={{ color: '#1890ff', borderBottom: '1px solid #f0f0f0', paddingBottom: 8 }}>
           {translate('Payment Details') || 'Payment Details'}
         </h4>
       </div>
 
-      <Row gutter={12}>
-        <Col span={24}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24}>
           <Form.Item label={translate('UPI ID') || 'UPI ID'} name={['paymentDetails', 'upiId']}>
             <Input placeholder={translate('enter_upi_id') || 'Enter UPI ID (optional)'} />
           </Form.Item>
         </Col>
       </Row>
 
-      <Row gutter={12}>
-        <Col span={24}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24}>
           <Form.Item label={translate('Bank Name') || 'Bank Name'} name={['paymentDetails', 'bankName']}>
             <Input placeholder={translate('enter_bank_name') || 'Enter Bank Name'} />
           </Form.Item>
@@ -345,27 +334,26 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
       </Row>
 
       <Row gutter={12}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item label={translate('Account Number') || 'Account Number'} name={['paymentDetails', 'accountNumber']}>
             <Input placeholder={translate('enter_account_number') || 'Enter Account Number'} />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item label={translate('IFSC Code') || 'IFSC Code'} name={['paymentDetails', 'ifscCode']}>
             <Input placeholder={translate('enter_ifsc_code') || 'Enter IFSC Code'} />
           </Form.Item>
         </Col>
       </Row>
 
-      <Row gutter={12}>
-        <Col span={24}>
+      <Row gutter={[16, 12]}>
+        <Col xs={24}>
           <Form.Item label={translate('Account Holder Name') || 'Account Holder Name'} name={['paymentDetails', 'accountHolderName']}>
             <Input placeholder={translate('enter_account_holder_name') || 'Enter Account Holder Name'} />
           </Form.Item>
         </Col>
       </Row>
 
-      {/* Save Button */}
       <div
         style={{
           display: 'flex',

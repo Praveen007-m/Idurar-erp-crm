@@ -25,7 +25,7 @@ const schema = new mongoose.Schema({
   email: String,
   photo: {
     type: String,
-    default: '',
+    default: null,
   },
   loanAmount: {
     type: Number,

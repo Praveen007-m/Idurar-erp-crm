@@ -42,6 +42,33 @@ const normalizeCollectionTime = (collectionTime) => {
   return collectionTime;
 };
 
+const normalizePaymentDetails = (body = {}) => {
+  if (body.paymentDetails && typeof body.paymentDetails === 'string') {
+    try {
+      body.paymentDetails = JSON.parse(body.paymentDetails);
+      return;
+    } catch (error) {
+      body.paymentDetails = {};
+    }
+  }
+
+  const paymentDetails =
+    typeof body.paymentDetails === 'object' && body.paymentDetails !== null
+      ? { ...body.paymentDetails }
+      : {};
+
+  Object.keys(body).forEach((key) => {
+    const match = key.match(/^paymentDetails\[(.+)\]$/);
+    if (!match) return;
+    paymentDetails[match[1]] = body[key];
+    delete body[key];
+  });
+
+  if (Object.keys(paymentDetails).length > 0) {
+    body.paymentDetails = paymentDetails;
+  }
+};
+
 function modelController() {
   const Model = mongoose.model('Client');
   const methods = createCRUDController('Client');
@@ -58,6 +85,11 @@ function modelController() {
 
       delete req.body.endDate;
       req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
+      normalizePaymentDetails(req.body);
+
+      if (req.file && !req.body.photo) {
+        req.body.photo = `/uploads/client/${req.file.filename}`;
+      }
 
       if (!req.body.assigned) {
         req.body.assigned = req.admin._id;
@@ -205,6 +237,11 @@ function modelController() {
 
       delete req.body.endDate;
       req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
+      normalizePaymentDetails(req.body);
+
+      if (req.file && !req.body.photo) {
+        req.body.photo = `/uploads/client/${req.file.filename}`;
+      }
 
       const existingClient = await Model.findOne(filter).exec();
 

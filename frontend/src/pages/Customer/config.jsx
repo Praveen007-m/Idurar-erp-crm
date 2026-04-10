@@ -1,4 +1,14 @@
 import dayjs from 'dayjs';
+import { createElement } from 'react';
+import { BASE_URL } from '@/config/serverApiConfig';
+
+const avatarStyle = {
+  width: 40,
+  height: 40,
+  borderRadius: '50%',
+  objectFit: 'cover',
+  background: '#fff',
+};
 
 const calculateFallbackEndDate = (startDate, term, repaymentType) => {
   if (!startDate || !term || !repaymentType) return null;
@@ -59,6 +69,25 @@ const formatCollectionTime = (time) => {
 };
 
 export const fields = {
+  photo: {
+    label: 'Photo',
+    render: (photo) => (
+      photo ? (
+        <img
+          src={`${BASE_URL}${photo}`}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            background: '#fff'
+          }}
+        />
+      ) : (
+        <div className="avatar-placeholder">N/A</div>
+      )
+    )
+  },
   name: {
     type: 'string',
   },

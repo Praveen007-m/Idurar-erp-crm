@@ -1,6 +1,6 @@
-import CrudModule from '@/modules/CrudModule/CrudModule';
+import CrudModule from '@/modules/CrudModule/CrudModule';
 import CustomerForm from '@/forms/CustomerForm';
-import { fields } from './config';
+import { fields } from './config.jsx';
 
 import useLanguage from '@/locale/useLanguage';
 import { HistoryOutlined, EyeOutlined } from '@ant-design/icons';

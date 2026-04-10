@@ -252,7 +252,7 @@ const routerApp = (entity, controller) => {
           entity: 'client',
           fieldName: 'photo',
           fileType: 'image',
-          uploadFieldName: 'file',
+          uploadFieldName: 'photo',
         }),
         catchErrors(controller['create'])
       );
@@ -271,7 +271,7 @@ const routerApp = (entity, controller) => {
           entity: 'client',
           fieldName: 'photo',
           fileType: 'image',
-          uploadFieldName: 'file',
+          uploadFieldName: 'photo',
         }),
         catchErrors(controller['update'])
       );

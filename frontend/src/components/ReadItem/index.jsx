@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, isValidElement } from 'react';
 import { Row, Col } from 'antd';
 import { useSelector } from 'react-redux';
 
@@ -28,7 +28,7 @@ export default function ReadItem({ config }) {
     return Object.keys(fields || {}).length > 0 ? dataForRead({ fields, translate }) : readColumnsFromConfig;
   }, [fields, readColumnsFromConfig, translate]);
 
-  const excludedKeys = ['paymentDetails', 'startDate', 'endDate', 'enabled', 'created', 'updated', '__v', '_id', 'removed', 'photo'];
+  const excludedKeys = ['paymentDetails', 'startDate', 'endDate', 'enabled', 'created', 'updated', '__v', '_id', 'removed'];
 
   const formatLabel = (key) => {
     if (!key) return '';
@@ -40,10 +40,11 @@ export default function ReadItem({ config }) {
   };
 
   const formatValue = (value) => {
-    if (value === undefined || value === null || value === '') return '—';
+    if (value === undefined || value === null || value === '') return '-';
+    if (isValidElement(value)) return value;
     if (typeof value === 'object') {
       if (value.name || value.email || value.label) {
-        return value.name || value.email || value.label || '—';
+        return value.name || value.email || value.label || '-';
       }
       return Array.isArray(value) ? value.join(', ') : JSON.stringify(value);
     }
@@ -66,7 +67,7 @@ export default function ReadItem({ config }) {
           if (typeof props?.render === 'function') {
             value = props.render(rawValue, currentResult || {});
           } else if (isDate) {
-            value = rawValue ? dayjs(rawValue).format(dateFormat) : '—';
+            value = rawValue ? dayjs(rawValue).format(dateFormat) : '-';
           }
 
           return { propsKey, label: formatLabel(propsTitle), value: formatValue(value) };
@@ -83,7 +84,9 @@ export default function ReadItem({ config }) {
     }
 
     setListState((prevListState) => {
-      const isEqual = prevListState.length === list.length && prevListState.every((item, index) => item.propsKey === list[index].propsKey && item.value === list[index].value);
+      const isEqual =
+        prevListState.length === list.length &&
+        prevListState.every((item, index) => item.propsKey === list[index].propsKey && item.value === list[index].value);
       return isEqual ? prevListState : list;
     });
   }, [currentResult, dateFormat, readColumns]);
