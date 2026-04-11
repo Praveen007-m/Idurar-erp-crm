@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const createCRUDController = require('@/controllers/middlewaresControllers/createCRUDController');
 const { buildStaffFilter }  = require('@/helpers/staffFilter');
-const customPdf = require('@/controllers/pdfController');
 
 const create  = require('./create');
 const summary = require('./summary');
@@ -224,39 +223,27 @@ function modelController() {
       if (!result) return res.status(404).json({ success: false, result: null, message: 'Payment not found' });
 
       const fileId          = `payment-${result._id}.pdf`;
-      let pdfBuffer;
+      const paymentMode = typeof result.paymentMode === 'string'
+        ? result.paymentMode
+        : result.paymentMode?.name || '-';
+      const reference = result.ref || result.reference?._id || '-';
+      const paymentDate = result.date
+        ? new Date(result.date).toLocaleDateString('en-GB')
+        : '-';
+      const amount = Number(result.amount || 0).toFixed(2);
 
-      try {
-        pdfBuffer = await customPdf.generatePdfBuffer(
-          'Payment',
-          { filename: 'payment', format: 'A4' },
-          result
-        );
-      } catch (pdfError) {
-        console.error('[payment.download] styled PDF generation failed, using fallback buffer:', pdfError.message);
-
-        const paymentMode = typeof result.paymentMode === 'string'
-          ? result.paymentMode
-          : result.paymentMode?.name || '-';
-        const reference = result.ref || result.reference?._id || '-';
-        const paymentDate = result.date
-          ? new Date(result.date).toLocaleDateString('en-GB')
-          : '-';
-        const amount = Number(result.amount || 0).toFixed(2);
-
-        pdfBuffer = buildSimplePdfBuffer([
-          `Receipt Number: ${result.number || '-'}/${result.year || ''}`.replace(/\/$/, ''),
-          `Date: ${paymentDate}`,
-          `Client: ${result.client?.name || '-'}`,
-          `Phone: ${result.client?.phone || '-'}`,
-          `Email: ${result.client?.email || '-'}`,
-          `Address: ${result.client?.address || '-'}`,
-          `Amount Paid: ${amount}`,
-          `Payment Mode: ${paymentMode}`,
-          `Reference: ${reference}`,
-          `Description: ${result.description || '-'}`,
-        ]);
-      }
+      const pdfBuffer = buildSimplePdfBuffer([
+        `Receipt Number: ${result.number || '-'}/${result.year || ''}`.replace(/\/$/, ''),
+        `Date: ${paymentDate}`,
+        `Client: ${result.client?.name || '-'}`,
+        `Phone: ${result.client?.phone || '-'}`,
+        `Email: ${result.client?.email || '-'}`,
+        `Address: ${result.client?.address || '-'}`,
+        `Amount Paid: ${amount}`,
+        `Payment Mode: ${paymentMode}`,
+        `Reference: ${reference}`,
+        `Description: ${result.description || '-'}`,
+      ]);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileId}"`);
