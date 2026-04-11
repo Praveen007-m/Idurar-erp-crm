@@ -18,28 +18,113 @@ function modelController() {
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)');
 
-  const buildSimplePdfBuffer = (lines = []) => {
-    const sanitizedLines = lines.filter(Boolean).slice(0, 30);
+  const splitPdfLine = (label, value, maxChars = 44) => {
+    const fullText = `${label}: ${value || '-'}`;
+    if (fullText.length <= maxChars) return [fullText];
+
+    const words = fullText.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    words.forEach((word) => {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (candidate.length > maxChars && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = candidate;
+      }
+    });
+
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+
+  const buildSimplePdfBuffer = ({ receiptInfo = [], clientDetails = [], paymentDetails = [], totalAmount = '-' }) => {
+    const drawTextBlock = (font, size, x, y, lines, rgb = '0 0 0') => {
+      const output = [`BT`, `${rgb} rg`, `/${font} ${size} Tf`, `${x} ${y} Td`];
+      lines.forEach((line, index) => {
+        if (index > 0) output.push('0 -16 Td');
+        output.push(`(${escapePdfText(line)}) Tj`);
+      });
+      output.push('ET');
+      return output;
+    };
+
+    const normalizedReceipt = receiptInfo.flatMap(({ label, value }) => splitPdfLine(label, value));
+    const normalizedClient = clientDetails.flatMap(({ label, value }) => splitPdfLine(label, value));
+    const normalizedPayment = paymentDetails.flatMap(({ label, value }) => splitPdfLine(label, value));
+
     const content = [
-      'BT',
-      '/F1 18 Tf',
-      '50 780 Td',
-      '(Payment Receipt) Tj',
-      '/F1 11 Tf',
-      '0 -28 Td',
-      ...sanitizedLines.flatMap((line, index) => {
-        const prefix = index === 0 ? [] : ['0 -18 Td'];
-        return [...prefix, `(${escapePdfText(line)}) Tj`];
-      }),
-      'ET',
+      '0.96 0.97 0.98 rg',
+      '0 0 595 842 re',
+      'f',
+
+      '1 1 1 rg',
+      '36 48 523 746 re',
+      'f',
+
+      '0.09 0.56 1 rg',
+      '36 730 523 64 re',
+      'f',
+
+      '0.09 0.56 1 rg',
+      '36 48 523 746 re',
+      '1.2 w',
+      'S',
+
+      ...drawTextBlock('F2', 24, 56, 768, ['Payment Receipt'], '1 1 1'),
+      ...drawTextBlock('F1', 11, 56, 748, ['Professional payment acknowledgement'], '0.90 0.96 1'),
+
+      '0.95 0.97 1 rg',
+      '56 650 220 64 re',
+      'f',
+      '0.89 0.94 0.99 rg',
+      '319 650 220 136 re',
+      'f',
+      '0.95 0.97 1 rg',
+      '56 500 220 136 re',
+      'f',
+      '0.89 0.94 0.99 rg',
+      '319 500 220 136 re',
+      'f',
+
+      ...drawTextBlock('F2', 12, 68, 694, ['Receipt Info'], '0.09 0.56 1'),
+      ...drawTextBlock('F1', 10.5, 68, 674, normalizedReceipt, '0.15 0.18 0.24'),
+
+      ...drawTextBlock('F2', 12, 331, 766, ['Company'], '0.09 0.56 1'),
+      ...drawTextBlock('F1', 10.5, 331, 746, [
+        'SS Finance',
+        'Reliable payment confirmation',
+        'Generated from the ERP system',
+      ], '0.15 0.18 0.24'),
+
+      ...drawTextBlock('F2', 12, 68, 616, ['Client Details'], '0.09 0.56 1'),
+      ...drawTextBlock('F1', 10.5, 68, 596, normalizedClient, '0.15 0.18 0.24'),
+
+      ...drawTextBlock('F2', 12, 331, 616, ['Payment Details'], '0.09 0.56 1'),
+      ...drawTextBlock('F1', 10.5, 331, 596, normalizedPayment, '0.15 0.18 0.24'),
+
+      '0.94 0.98 0.95 rg',
+      '56 410 483 66 re',
+      'f',
+      '0.13 0.55 0.13 rg',
+      '56 410 483 66 re',
+      '1.2 w',
+      'S',
+      ...drawTextBlock('F2', 12, 72, 450, ['Total Amount Paid'], '0.13 0.45 0.13'),
+      ...drawTextBlock('F2', 22, 72, 426, [totalAmount], '0.10 0.55 0.10'),
+
+      ...drawTextBlock('F1', 9.5, 56, 84, ['This receipt was generated automatically by the payment system.'], '0.45 0.50 0.58'),
     ].join('\n');
 
     const objects = [
       '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj',
       '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj',
-      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj',
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj',
       '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj',
-      `5 0 obj\n<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream\nendobj`,
+      '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj',
+      `6 0 obj\n<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream\nendobj`,
     ];
 
     let pdf = '%PDF-1.4\n';
@@ -232,18 +317,24 @@ function modelController() {
         : '-';
       const amount = Number(result.amount || 0).toFixed(2);
 
-      const pdfBuffer = buildSimplePdfBuffer([
-        `Receipt Number: ${result.number || '-'}/${result.year || ''}`.replace(/\/$/, ''),
-        `Date: ${paymentDate}`,
-        `Client: ${result.client?.name || '-'}`,
-        `Phone: ${result.client?.phone || '-'}`,
-        `Email: ${result.client?.email || '-'}`,
-        `Address: ${result.client?.address || '-'}`,
-        `Amount Paid: ${amount}`,
-        `Payment Mode: ${paymentMode}`,
-        `Reference: ${reference}`,
-        `Description: ${result.description || '-'}`,
-      ]);
+      const pdfBuffer = buildSimplePdfBuffer({
+        receiptInfo: [
+          { label: 'Receipt Number', value: `${result.number || '-'}${result.year ? `/${result.year}` : ''}` },
+          { label: 'Date', value: paymentDate },
+        ],
+        clientDetails: [
+          { label: 'Client', value: result.client?.name || '-' },
+          { label: 'Phone', value: result.client?.phone || '-' },
+          { label: 'Email', value: result.client?.email || '-' },
+          { label: 'Address', value: result.client?.address || '-' },
+        ],
+        paymentDetails: [
+          { label: 'Payment Mode', value: paymentMode },
+          { label: 'Reference', value: reference },
+          { label: 'Description', value: result.description || '-' },
+        ],
+        totalAmount: amount,
+      });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileId}"`);
