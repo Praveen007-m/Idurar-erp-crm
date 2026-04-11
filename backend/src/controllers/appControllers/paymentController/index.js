@@ -187,13 +187,9 @@ function modelController() {
         { filename: 'payment', format: 'A4', targetLocation },
         result,
         async () => {
-          res.setHeader('Content-Type',        'application/pdf');
           res.setHeader('Content-Disposition', `attachment; filename=${fileId}`);
-          return res.download(targetLocation, fileId, (error) => {
-            if (error && !res.headersSent) {
-              return res.status(500).json({ success: false, result: null, message: "Couldn't download payment pdf", error: error.message });
-            }
-          });
+          res.setHeader('Content-Type', 'application/pdf');
+          return res.download(targetLocation);
         }
       );
     } catch (error) {
