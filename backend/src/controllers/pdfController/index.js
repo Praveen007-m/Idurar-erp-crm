@@ -82,3 +82,65 @@ exports.generatePdf = async (
     throw new Error(error);
   }
 };
+
+exports.generatePdfBuffer = async (
+  modelName,
+  info = { filename: 'pdf_file', format: 'A5' },
+  result
+) => {
+  if (!pugFiles.includes(modelName.toLowerCase())) {
+    throw new Error(`Unsupported PDF template: ${modelName}`);
+  }
+
+  const settings = await loadSettings();
+  const selectedLang = settings['idurar_app_language'];
+  const translate = useLanguage({ selectedLang });
+
+  const {
+    currency_symbol,
+    currency_position,
+    decimal_sep,
+    thousand_sep,
+    cent_precision,
+    zero_format,
+  } = settings;
+
+  const { moneyFormatter } = useMoney({
+    settings: {
+      currency_symbol,
+      currency_position,
+      decimal_sep,
+      thousand_sep,
+      cent_precision,
+      zero_format,
+    },
+  });
+  const { dateFormat } = useDate({ settings });
+
+  settings.public_server_file = process.env.PUBLIC_SERVER_FILE;
+
+  const htmlContent = pug.renderFile('src/pdf/' + modelName + '.pug', {
+    model: result,
+    settings,
+    translate,
+    dateFormat,
+    moneyFormatter,
+    moment: moment,
+  });
+
+  return await new Promise((resolve, reject) => {
+    pdf
+      .create(htmlContent, {
+        format: info.format,
+        orientation: 'portrait',
+        border: '10mm',
+      })
+      .toBuffer((error, buffer) => {
+        if (error) {
+          reject(new Error(error));
+          return;
+        }
+        resolve(buffer);
+      });
+  });
+};
