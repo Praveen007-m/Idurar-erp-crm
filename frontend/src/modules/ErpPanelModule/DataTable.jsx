@@ -31,7 +31,7 @@ import { erp } from '@/redux/erp/actions';
 import { selectListItems } from '@/redux/erp/selectors';
 import { useErpContext } from '@/context/erp';
 import { useNavigate } from 'react-router-dom';
-import { DOWNLOAD_BASE_URL } from '@/config/serverApiConfig';
+import { API_BASE_URL, DOWNLOAD_BASE_URL } from '@/config/serverApiConfig';
 import { downloadPaymentPdf } from '@/utils/downloadPaymentPdf';
 
 const { RangePicker } = DatePicker;
@@ -115,19 +115,27 @@ export default function DataTable({ config, extra = [] }) {
 
     setExporting(true);
     try {
-      // Read the JWT token exactly the way Idurar's request.js reads it
-      const auth = JSON.parse(localStorage.getItem('auth') || '{}');
-      const token = auth?.current?.token || '';
+      const normalizeToken = (rawToken) => {
+        if (typeof rawToken !== 'string') return null;
+        const trimmedToken = rawToken.trim();
+        if (!trimmedToken) return null;
+        return trimmedToken.toLowerCase().startsWith('bearer ')
+          ? trimmedToken.slice(7).trim()
+          : trimmedToken;
+      };
 
-      // Build the absolute backend URL — avoids Vite proxy entirely
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888/api';
-      const url      = `${API_BASE}/payment/export?from=${fromStr}&to=${toStr}`;
+      const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+      const token =
+        normalizeToken(localStorage.getItem('token')) ||
+        normalizeToken(auth?.current?.token) ||
+        '';
+
+      const url = `${API_BASE_URL}/payment/export?from=${fromStr}&to=${toStr}`;
 
       const response = await fetch(url, {
         method:  'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type':  'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
