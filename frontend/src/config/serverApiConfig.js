@@ -4,15 +4,14 @@
  */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_SERVER;
 const API_URL = import.meta.env.VITE_API_URL;
+const PROD_SERVER_URL = API_URL || BACKEND_URL || "https://idurar-erp-crm-production-8878.up.railway.app";
 
 /**
  * API URL
  */
 export const API_BASE_URL =
   import.meta.env.MODE === "production"
-    ? API_URL
-      ? `${API_URL}/api`
-      : `${BACKEND_URL}/api`
+    ? `${PROD_SERVER_URL}/api`
     : "http://localhost:8888/api";
 
 console.log('[API Config] Mode:', import.meta.env.MODE);
@@ -23,7 +22,7 @@ console.log('[API Config] BASE_URL:', API_BASE_URL);
  */
 export const BASE_URL =
   import.meta.env.MODE === "production"
-    ? BACKEND_URL
+    ? PROD_SERVER_URL
     : "http://localhost:8888";
 
 /**
@@ -39,7 +38,7 @@ export const WEBSITE_URL =
  */
 export const DOWNLOAD_BASE_URL =
   import.meta.env.MODE === "production"
-    ? `${BACKEND_URL}/download`
+    ? `${PROD_SERVER_URL}/download`
     : "http://localhost:8888/download";
 
 /**
