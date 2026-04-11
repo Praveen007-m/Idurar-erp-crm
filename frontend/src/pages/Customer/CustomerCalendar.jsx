@@ -30,6 +30,12 @@ import { BASE_URL } from '@/config/baseUrl';
 
 const { useBreakpoint } = Grid;
 
+const getClientPhotoUrl = (photo) => {
+  if (!photo || photo === 'null') return null;
+  if (/^https?:\/\//i.test(photo)) return photo;
+  return `${BASE_URL}${photo}`;
+};
+
 const BOX_BORDER = '#28a7ab';
 const BOX_TEXT = '#117a8b';
 const HEADER_BG = 'linear-gradient(90deg, rgba(40,167,171,0.14) 0%, rgba(24,144,255,0.06) 100%)';
@@ -216,7 +222,7 @@ export default function CustomerCalendar() {
   const today = dayjs().startOf('day');
 
   const openProfilePreview = () => {
-    if (!client?.photo) return;
+    if (!getClientPhotoUrl(client?.photo)) return;
     setProfilePreviewOpen(true);
   };
 
@@ -411,9 +417,9 @@ export default function CustomerCalendar() {
           <Row gutter={[12, 12]} align="middle">
             <Col xs={24} sm={8}>
               <Space>
-                {client?.photo ? (
+                {getClientPhotoUrl(client?.photo) ? (
                   <img
-                    src={`${BASE_URL}${client.photo}`}
+                    src={getClientPhotoUrl(client.photo)}
                     alt="client"
                     style={{
                       width: isMobile ? 40 : 48,
@@ -427,7 +433,8 @@ export default function CustomerCalendar() {
                     }}
                     onClick={openProfilePreview}
                     onError={(e) => {
-                      e.target.src = '/default-avatar.png';
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/default-avatar.svg';
                     }}
                   />
                 ) : (
@@ -697,9 +704,9 @@ export default function CustomerCalendar() {
               <Descriptions title={<Typography.Text type="secondary">BASIC INFO</Typography.Text>} bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }} style={{ marginBottom: 20 }}>
                 <Descriptions.Item label="Name">{client.name}</Descriptions.Item>
                 <Descriptions.Item label="Profile Photo">
-                  {client?.photo ? (
+                  {getClientPhotoUrl(client?.photo) ? (
                     <img
-                      src={`${BASE_URL}${client.photo}`}
+                      src={getClientPhotoUrl(client.photo)}
                       alt="client"
                       style={{
                         width: 56,
@@ -712,7 +719,8 @@ export default function CustomerCalendar() {
                       }}
                       onClick={openProfilePreview}
                       onError={(e) => {
-                        e.target.src = '/default-avatar.png';
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/default-avatar.svg';
                       }}
                     />
                   ) : (
@@ -842,9 +850,9 @@ export default function CustomerCalendar() {
           width={isMobile ? '95vw' : 720}
           destroyOnClose
         >
-          {client?.photo && (
+          {getClientPhotoUrl(client?.photo) && (
             <img
-              src={`${BASE_URL}${client.photo}`}
+              src={getClientPhotoUrl(client.photo)}
               alt={client?.name || 'Client photo'}
               style={{
                 width: '100%',
@@ -853,7 +861,8 @@ export default function CustomerCalendar() {
                 background: '#fff',
               }}
               onError={(e) => {
-                e.target.src = '/default-avatar.png';
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/default-avatar.svg';
               }}
             />
           )}

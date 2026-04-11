@@ -98,13 +98,13 @@ export default function CustomerForm({ isUpdateForm = false, form }) {
     <>
       {/* Photo */}
       <Form.Item
-        name="file"
+        name="photo"
         label="Photo"
         valuePropName="fileList"
-        getValueFromEvent={(e) => e?.fileList}
+        getValueFromEvent={normalizeFile}
       >
         <Upload
-          beforeUpload={() => false}
+          beforeUpload={beforeUpload}
           maxCount={1}
           accept="image/*"
           listType="picture-card"

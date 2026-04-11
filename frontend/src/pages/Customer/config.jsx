@@ -10,6 +10,12 @@ const avatarStyle = {
   background: '#fff',
 };
 
+const getClientPhotoUrl = (photo) => {
+  if (!photo || photo === 'null') return null;
+  if (/^https?:\/\//i.test(photo)) return photo;
+  return `${BASE_URL}${photo}`;
+};
+
 const calculateFallbackEndDate = (startDate, term, repaymentType) => {
   if (!startDate || !term || !repaymentType) return null;
 
@@ -72,21 +78,17 @@ export const fields = {
   photo: {
     label: 'Photo',
     render: (photo) => {
-      if (!photo) return 'N/A';
+      const imageUrl = getClientPhotoUrl(photo);
+      if (!imageUrl) return 'N/A';
 
       return (
         <img
-          src={`${BASE_URL}${photo}`}
+          src={imageUrl}
           alt="client"
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            background: '#fff'
-          }}
+          style={avatarStyle}
           onError={(e) => {
-            e.target.src = '/default-avatar.png';
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/default-avatar.svg';
           }}
         />
       );

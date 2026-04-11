@@ -19,6 +19,12 @@ import { BASE_URL } from '@/config/baseUrl';
 
 import { CrudLayout } from '@/layout';
 
+const getClientPhotoUrl = (photo) => {
+  if (!photo || photo === 'null') return null;
+  if (/^https?:\/\//i.test(photo)) return photo;
+  return `${BASE_URL}${photo}`;
+};
+
 function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
   const translate = useLanguage();
   const { crudContextAction, state } = useCrudContext();
@@ -57,9 +63,9 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
       <Row style={show} gutter={[24, 24]}>
         <Col xs={24} md={10}>
           <p style={{ marginBottom: '10px' }}>{labels}</p>
-          {currentItem?.photo && (
+          {getClientPhotoUrl(currentItem?.photo) && (
             <img
-              src={`${BASE_URL}${currentItem.photo}`}
+              src={getClientPhotoUrl(currentItem.photo)}
               alt="client"
               style={{
                 width: 80,
@@ -69,9 +75,10 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
                 background: '#fff',
                 cursor: 'pointer'
               }}
-              onClick={() => window.open(`${BASE_URL}${currentItem.photo}`, '_blank')}
+              onClick={() => window.open(getClientPhotoUrl(currentItem.photo), '_blank')}
               onError={(e) => {
-                e.target.src = '/default-avatar.png';
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/default-avatar.svg';
               }}
             />
           )}
@@ -113,6 +120,10 @@ function SidePanelTopContent({ config, formElements, withUpload, onCancel }) {
 }
 
 function FixHeaderPanel({ config }) {
+  if (config.entity === 'client') {
+    return null;
+  }
+
   const { crudContextAction } = useCrudContext();
   const translate = useLanguage();
 

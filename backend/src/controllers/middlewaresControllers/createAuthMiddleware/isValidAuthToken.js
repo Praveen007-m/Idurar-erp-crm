@@ -62,6 +62,19 @@ const isValidAuthToken = async (req, res, next, { userModel, jwtSecret = 'JWT_SE
     next();
 
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError || error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({
+        success: false,
+        result: null,
+        message: error instanceof jwt.TokenExpiredError
+          ? 'JWT expired, authorization denied.'
+          : 'Invalid authentication token, authorization denied.',
+        error: error.message,
+        controller: 'isValidAuthToken',
+        jwtExpired: true,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       result: null,

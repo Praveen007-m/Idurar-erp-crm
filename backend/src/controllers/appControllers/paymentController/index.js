@@ -187,7 +187,7 @@ function modelController() {
         { filename: 'payment', format: 'A4', targetLocation },
         result,
         async () => {
-          res.setHeader('Content-Disposition', `attachment; filename=${fileId}`);
+          res.setHeader('Content-Disposition', `attachment; filename="${fileId}"`);
           res.setHeader('Content-Type', 'application/pdf');
           return res.download(targetLocation);
         }

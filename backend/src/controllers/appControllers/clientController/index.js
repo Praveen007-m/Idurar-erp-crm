@@ -69,6 +69,17 @@ const normalizePaymentDetails = (body = {}) => {
   }
 };
 
+const normalizePhotoPath = (body = {}, file) => {
+  if (file?.filename) {
+    body.photo = body.photo || `/uploads/client/${file.filename}`;
+    return;
+  }
+
+  if (body.photo === 'null' || body.photo === 'undefined' || body.photo === '') {
+    delete body.photo;
+  }
+};
+
 function modelController() {
   const Model = mongoose.model('Client');
   const methods = createCRUDController('Client');
@@ -86,10 +97,7 @@ function modelController() {
       delete req.body.endDate;
       req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
       normalizePaymentDetails(req.body);
-
-      if (req.file && !req.body.photo) {
-        req.body.photo = `/uploads/client/${req.file.filename}`;
-      }
+      normalizePhotoPath(req.body, req.file);
 
       if (!req.body.assigned) {
         req.body.assigned = req.admin._id;
@@ -238,10 +246,7 @@ function modelController() {
       delete req.body.endDate;
       req.body.collectionTime = normalizeCollectionTime(req.body.collectionTime);
       normalizePaymentDetails(req.body);
-
-      if (req.file && !req.body.photo) {
-        req.body.photo = `/uploads/client/${req.file.filename}`;
-      }
+      normalizePhotoPath(req.body, req.file);
 
       const existingClient = await Model.findOne(filter).exec();
 

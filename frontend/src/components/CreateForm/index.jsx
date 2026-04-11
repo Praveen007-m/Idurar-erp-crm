@@ -37,11 +37,23 @@ export default function CreateForm({ config, formElements, withUpload = false, o
   const onSubmit = (fieldsValue) => {
     const normalizedValues = normalizeFormValues(fieldsValue);
 
-    // Manually trim values before submission
+    if (withUpload) {
+      if (Array.isArray(normalizedValues.photo)) {
+        normalizedValues.photo = normalizedValues.photo[0]?.originFileObj || null;
+      } else if (
+        normalizedValues.photo &&
+        typeof normalizedValues.photo === 'object' &&
+        normalizedValues.photo.fileList
+      ) {
+        normalizedValues.photo = normalizedValues.photo.fileList[0]?.originFileObj || null;
+      } else if (normalizedValues.file?.[0]?.originFileObj) {
+        normalizedValues.photo = normalizedValues.file[0].originFileObj;
+        delete normalizedValues.file;
+      }
+    }
 
-    if (normalizedValues.file && withUpload) {
-      normalizedValues.photo = normalizedValues.file[0].originFileObj;
-      delete normalizedValues.file;
+    if (normalizedValues.photo == null) {
+      delete normalizedValues.photo;
     }
 
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {

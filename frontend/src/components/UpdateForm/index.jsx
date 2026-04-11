@@ -68,9 +68,23 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
     const id = current._id;
     const normalizedValues = normalizeFormValues(fieldsValue);
 
-    if (normalizedValues.file && withUpload) {
-      normalizedValues.photo = normalizedValues.file[0].originFileObj;
-      delete normalizedValues.file;
+    if (withUpload) {
+      if (Array.isArray(normalizedValues.photo)) {
+        normalizedValues.photo = normalizedValues.photo[0]?.originFileObj || null;
+      } else if (
+        normalizedValues.photo &&
+        typeof normalizedValues.photo === 'object' &&
+        normalizedValues.photo.fileList
+      ) {
+        normalizedValues.photo = normalizedValues.photo.fileList[0]?.originFileObj || null;
+      } else if (normalizedValues.file?.[0]?.originFileObj) {
+        normalizedValues.photo = normalizedValues.file[0].originFileObj;
+        delete normalizedValues.file;
+      }
+    }
+
+    if (normalizedValues.photo == null) {
+      delete normalizedValues.photo;
     }
     // const trimmedValues = Object.keys(fieldsValue).reduce((acc, key) => {
     //   acc[key] = typeof fieldsValue[key] === 'string' ? fieldsValue[key].trim() : fieldsValue[key];
@@ -97,6 +111,12 @@ export default function UpdateForm({ config, formElements, withUpload = false, o
         newValues = {
           ...newValues,
           startDate: dayjs(newValues['startDate']),
+        };
+      }
+      if (typeof newValues.photo === 'string') {
+        newValues = {
+          ...newValues,
+          photo: [],
         };
       }
       if (newValues.collectionTime) {
